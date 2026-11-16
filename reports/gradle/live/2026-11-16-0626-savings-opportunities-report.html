@@ -1,0 +1,1731 @@
+<!doctype html>
+<!--
+  Savings opportunities report — a self-contained snapshot of one detection run.
+
+  The run's data is embedded in the #report-data island below and everything on this page renders
+  from it; the file loads no remote scripts, styles, fonts, or images.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Build Caching Optimizer - Top Savings Opportunities</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg-primary:#edeeef;   /* $color-background */
+    --bg-secondary:#f7f7f8; /* $color-background-light */
+    --bg-card:#ffffff;      /* $color-background-lighter */
+    --bg-card-hover:#f7f7f8;
+    --bg-input:#ffffff; --border:#d6d9db; --border-hover:#afafaf; /* $color-grey-light / $color-grey */
+    --chip-bg:#eaeaea;      /* $color-grey-lighter */
+    --text-primary:#02303a; /* $color-text ($color-product-primary) */
+    --text-secondary:#686868; /* $color-text-light */
+    --text-muted:#757575;   /* $color-text-lighter */
+    --shell:#02303a;        /* $color-product-primary — the app header bar */
+    --accent-start:#069fce; --accent-end:#51cbbf; /* $color-gradient-primary-from/-to */
+    --accent-hover-start:#06aadd; --accent-hover-end:#5dcfc3;
+    --link:#008299;         /* $color-blue-light-fallback */
+    /* Pill text only. Must clear 4.5:1 against the pill tint composited over --bg-card-hover and
+       --bg-secondary (#f7f7f8), not just --bg-card: the tint is semi-transparent, so the row-hover
+       and detail-panel grounds show through and are the darker case. */
+    --link-strong:#00707f;
+    /* The Recency dot. Teal rather than a status colour: green-through-red would read as a verdict
+       on whether the cause is fixed, which no surface here is entitled to make. One colour, because
+       only "Recent" carries a dot. */
+    --recency-recent:#1f8f86;
+    /* Remote Build Cache adoption: an estimate, so it never borrows the measured figures' gradient or amber.
+       The violet clears 4.5:1 against its own row tint as well as against white. */
+    --estimate:#6b5bb5; --estimate-bg:#efedf8;
+    --link-hover:#35c1e4;   /* $link-text-color-hover */
+    --status-pass:#19aa5d; --status-fail:#dc4a2d; /* $color-status-success / -failure */
+    --status-warn:#dead22; --status-warn-strong:#d8a400; /* $color-yellow-dark / -darkest */
+    --grey-strong:#585858;  /* $color-grey-darkest */
+    --font-mono:'Inconsolata', 'Monaco', 'Courier New', ui-monospace, monospace; /* $font-monospace-family */
+    --font-sans:'Lato', -apple-system, "Segoe UI", Roboto, Helvetica, sans-serif; /* $font-main-family */
+    --radius:8px; --radius-sm:4px; --radius-lg:12px;
+    --header-h:61px; --strip-h:38px;
+    --fs-2xs:0.43rem; --fs-xs:0.48rem; --fs-sm:0.52rem; --fs-base:0.62rem;
+    --fs-md:0.67rem; --fs-lg:0.71rem; --fs-xl:1.3rem; --fs-2xl:1.6rem;
+    --accent-grad:linear-gradient(135deg, var(--accent-start), var(--accent-end)); /* $color-gradient-primary */
+    --accent-grad-hover:linear-gradient(135deg, var(--accent-hover-start), var(--accent-hover-end));
+  }
+
+  @supports (color: lch(0% 0 0)) {
+    :root { --link:lch(51% 40 221); } /* $color-blue-light */
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { font-size:21px; }
+  body {
+    background:var(--bg-primary); color:var(--text-primary); font-family:var(--font-sans);
+    font-size:var(--fs-base); line-height:1.5; -webkit-font-smoothing:antialiased;
+    /* Never narrower than the narrowest the content can squeeze to, so the header and the scope
+       strip — sticky, and as wide as the body — keep their backgrounds under their own content
+       once the window forces the page to scroll sideways. Without it the two bands stop at the
+       viewport edge while the strip's items carry on past it. min-content, not max-content:
+       max-content resolves to .container's 1360px cap and would scroll every narrower window. */
+    min-width:min-content;
+  }
+  a { color:var(--link); text-decoration:none; transition:color .15s; }
+  a:hover { color:var(--link-hover); }
+  :focus-visible { outline:1.5px solid var(--shell); outline-offset:2px; border-radius:var(--radius-sm); } /* $color-product-primary, per base.scss:57 */
+  ::selection { background:rgba(6,159,206,0.2); }
+  /* thin scrollbars */
+  * { scrollbar-width:thin; scrollbar-color:var(--border-hover) transparent; }
+  *::-webkit-scrollbar { height:10px; width:10px; }
+  *::-webkit-scrollbar-thumb { background:var(--border-hover); border-radius:6px; }
+
+  .container { max-width:1360px; margin:0 auto; padding:0 24px; }
+
+  /* ── HEADER ─────────────────────────────── */
+  .header {
+    position:sticky; top:0; z-index:15; height:var(--header-h);
+    background:var(--shell);
+    display:flex; align-items:center;
+  }
+  .header .container { display:flex; align-items:center; justify-content:space-between; width:100%; }
+  .brand-crumb { font-family:var(--font-mono); font-size:var(--fs-md); color:rgba(255,255,255,0.55); display:flex; align-items:center; gap:0; flex-wrap:wrap; }
+  /* 160px is $gradle-logo-width, the size the app's TopNav renders this same lockup at.
+     translateY re-centers the WORDMARK on the crumb text line: the "by Gradle Technologies"
+     tagline hangs below it, so centering the SVG's box rides the wordmark ~3px high at this
+     width. Re-derive the offset if the width changes. */
+  .brand-logo { width:160px; height:auto; display:block; color:#fff; flex-shrink:0; transform:translateY(3px); }
+  .brand-crumb .sep { color:rgba(255,255,255,0.35); margin:0 8px; }
+  .brand-crumb .mid { color:rgba(255,255,255,0.75); }
+  .brand-crumb .title { color:#ffffff; font-weight:600; }
+  /* The header is a fixed --header-h tall and holds the row filter at its right, so the crumb never
+     wraps: on a narrower window it drops its middle segment instead, which the title still names. */
+  .brand-crumb { flex-wrap:nowrap; white-space:nowrap; }
+  @media (max-width:1200px) { .brand-crumb .mid, .brand-crumb .mid + .sep { display:none; } }
+
+  /* ── VERSION / SCOPE STRIP ──────────────── */
+  .strip {
+    position:sticky; top:var(--header-h); z-index:14; height:var(--strip-h);
+    background:var(--bg-card); border-bottom:1px solid var(--border);
+    display:flex; align-items:center;
+  }
+  .strip .container { display:flex; align-items:center; gap:14px; width:100%; }
+  .vs-item { display:flex; align-items:baseline; gap:6px; white-space:nowrap; }
+  .vs-label { font-family:var(--font-mono); font-size:var(--fs-sm); font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); opacity:0.65; }
+  .vs-value { font-family:var(--font-mono); font-size:var(--fs-base); color:var(--text-secondary); }
+  .vs-value.strong { color:var(--text-primary); font-weight:600; }
+  .vs-value.dim { color:var(--text-muted); }
+  .vs-sep { width:1px; height:16px; background:var(--border); flex-shrink:0; }
+
+  /* ── MAIN ───────────────────────────────── */
+  .main { padding:24px 0 72px; }
+  .section { margin-bottom:24px; }
+
+  .callout {
+    background:var(--bg-card); border:1px solid var(--border); border-left:2px solid var(--accent-start);
+    border-radius:var(--radius); padding:12px 16px; font-size:var(--fs-base); color:var(--text-secondary); line-height:1.6;
+  }
+  .callout b { color:var(--text-primary); font-weight:700; }
+
+  /* ── METRIC CARDS ───────────────────────── */
+  /* auto-fit, not a fixed four. A fixed four holds only while the page draws exactly four cards, and
+     it left a hole on the right the moment one went. auto-fit collapses the empty tracks, so the
+     row fills itself at any count — which is what it needed while the count card was out, and what
+     keeps it right now that the card is back. */
+  .metrics-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; margin-bottom:24px; }
+  .metric-card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); padding:16px; transition:border-color .15s; }
+  .metric-card:hover { border-color:var(--border-hover); }
+  .metric-label { font-size:var(--fs-base); font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); margin-bottom:8px; }
+  .metric-value { font-family:var(--font-mono); font-size:var(--fs-2xl); font-weight:700; line-height:1; margin-bottom:4px; }
+  .metric-value.sm { font-size:var(--fs-xl); }
+  .metric-value.gradient { background:var(--accent-grad); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+  .metric-value.warn { color:var(--status-warn-strong); }
+  .metric-value.ok { color:var(--status-pass); }
+  .metric-value.estimate { color:var(--estimate); }
+  /* The second line of the Recoverable CI time card, set off by a dashed rule so the estimate and the
+     measured figure are never read as one. */
+  .metric-estimate { margin-top:12px; padding-top:12px; border-top:1px dashed var(--border); }
+  .metric-value small { font-size:var(--fs-md); font-weight:500; color:var(--text-muted); }
+  /* All four cards state their own detail under their value, and the small info icon beside every
+     label points at the account that states it in full. The icon is the same on every card, in place
+     of a "See details" link on the Coverage card alone; the sub-lines are this report's own
+     content and stay, because they carry facts this report has a reason to show — the reach and the
+     project count, the inspected split, the project partition, the window the rate was measured
+     over. A card's tooltip therefore never restates its sub-line: it carries what the sub-line has
+     no room for. On the rate card that line is drawn twice over: the sub-line owns the window
+     arithmetic and the tooltip owns the meaning, so the tooltip names no window at all — it named
+     one, and then the two halves said one thing twice on every window but seven. */
+  .metric-sub { font-family:var(--font-mono); font-size:var(--fs-base); color:var(--text-muted); }
+  /* The Coverage card's projects as one stacked bar where the run counted them and the verdict is
+     complete, with a legend of the counts under it: the two prose lines it replaces were hard to read.
+     Each segment is as wide as its project count. */
+  .cov-bar { display:flex; gap:2px; height:18px; margin:8px 0; border-radius:var(--radius-sm); overflow:hidden; background:var(--chip-bg); }
+  /* Each segment prints its count where the count fits; `narrow` hides it on a segment too thin for
+     it, and the legend under the bar carries every count either way. */
+  .cov-bar span {
+    min-width:4px; display:flex; align-items:center; justify-content:center; overflow:hidden; padding:0 4px;
+    font-family:var(--font-mono); font-size:var(--fs-sm); font-weight:700; line-height:1; color:#ffffff;
+  }
+  .cov-bar span.cov-partial, .cov-bar span.cov-other { color:var(--text-primary); }
+  .cov-bar span.narrow { color:transparent; }
+  /* One item per line, as in the mockup: a wrapping row broke wherever the card's width fell. */
+  .cov-legend { display:flex; flex-direction:column; gap:4px; font-family:var(--font-mono); font-size:var(--fs-sm); color:var(--text-muted); }
+  /* An item too long for a narrow card wraps under its own text rather than past the card's edge. */
+  .cov-legend span { display:flex; align-items:flex-start; gap:5px; }
+  .cov-legend i { width:8px; height:8px; border-radius:2px; flex-shrink:0; margin-top:0.35em; }
+  .cov-full { background:var(--status-pass); }
+  .cov-partial { background:color-mix(in srgb, var(--status-pass) 40%, var(--bg-card)); }
+  .cov-uses { background:var(--accent-start); }
+  .cov-disabled { background:var(--estimate); }
+  .cov-other { background:var(--border-hover); }
+  .metric-info { display:inline-block; margin-left:6px; vertical-align:-2px; opacity:0.55; }
+  .metric-info:hover, .metric-info:focus { opacity:1; }
+  .metric-info svg { display:block; }
+  /* Offset the fragment-jump target below the sticky header and scope strip. */
+  #coverageSection { scroll-margin-top: calc(var(--header-h) + var(--strip-h) + 12px); }
+
+  /* ── BUTTON ─────────────────────────────── */
+  .btn {
+    font-family:var(--font-mono); font-size:var(--fs-base); font-weight:600; cursor:pointer;
+    background:var(--bg-card); color:var(--text-secondary); border:1px solid var(--border);
+    border-radius:var(--radius); padding:9px 14px; display:inline-flex; align-items:center; gap:7px; transition:border-color .15s, color .15s;
+  }
+  .btn:hover { border-color:var(--border-hover); color:var(--text-primary); }
+
+  /* ── CARD ───────────────────────────────── */
+  .card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden; }
+  .card-header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:0 16px; height:40px; border-bottom:1px solid var(--border); }
+  .card-title { font-size:var(--fs-lg); font-weight:700; color:var(--text-primary); }
+  /* The filter over the two kinds of row: a segmented toggle at the right of the dark header, so it
+     reads as a switch rather than as tabs, above the tiles and the table it switches, and in reach in
+     a long table since the header is sticky. Each segment carries a dot in the colour its rows and
+     figures use, so the reader sees which one to pick before picking it; the selected segment is
+     filled. */
+  .row-filter {
+    display:inline-flex; flex-shrink:0; margin-left:24px; padding:3px; gap:2px;
+    border:1px solid rgba(255,255,255,0.28); border-radius:999px; background:rgba(255,255,255,0.06);
+  }
+  .row-filter button {
+    --dot:rgba(255,255,255,0.8);
+    display:inline-flex; align-items:center; gap:7px;
+    font-family:var(--font-mono); font-size:var(--fs-sm); font-weight:700; white-space:nowrap; cursor:pointer;
+    padding:5px 12px; border:0; border-radius:999px; background:none; color:rgba(255,255,255,0.78);
+  }
+  .row-filter button::before { content:""; width:8px; height:8px; border-radius:50%; background:var(--dot); }
+  .row-filter button[data-filter="remote_cache_adoption"] { --dot:#ab9ff0; }
+  .row-filter button[data-filter="cache_miss"] { --dot:var(--status-warn); }
+  .row-filter button:hover { color:#ffffff; background:rgba(255,255,255,0.10); }
+  .row-filter button[aria-pressed="true"] { color:var(--shell); background:#ffffff; }
+  .row-filter button[aria-pressed="true"][data-filter="remote_cache_adoption"]::before { background:var(--estimate); }
+  .row-filter button[aria-pressed="true"][data-filter="cache_miss"]::before { background:var(--status-warn-strong); }
+  .row-filter button[aria-pressed="true"][data-filter="all"]::before { background:var(--shell); }
+  .row-filter button:focus-visible { outline:1.5px solid #ffffff; outline-offset:2px; }
+  .card-empty { padding:14px 16px; font-size:var(--fs-base); color:var(--text-muted); }
+  /* ── TABLE ──────────────────────────────── */
+  .table-wrap { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; }
+  thead th {
+    font-family:var(--font-mono); font-size:var(--fs-sm); font-weight:600; text-transform:uppercase; letter-spacing:0.06em;
+    color:var(--text-muted); text-align:left; padding:10px 12px; border-bottom:1px solid var(--border); white-space:nowrap; background:var(--bg-card);
+  }
+  /* Where to paste, in the column header rather than the button: a button label carrying the project
+     name would change width per row. Normal case and wrapping, so it reads as a sentence. */
+  .fix-how {
+    display:block; margin-top:3px; max-width:26ch; font-family:var(--font-sans); font-size:var(--fs-2xs);
+    font-weight:400; text-transform:none; letter-spacing:0; white-space:normal; color:var(--text-muted);
+  }
+  /* Says where a copied prompt is meant to run: once above the table, not once per row. Set off from
+     the rows rather than reading as a caption — the accent edge and tint carry the emphasis, the
+     sentence stays plain. An inset box takes no bottom rule; that belonged to the full-bleed band
+     this replaced, which had to separate itself from the table. */
+  .fix-note {
+    margin:12px 16px 0; padding:9px 12px; font-size:var(--fs-base); line-height:1.6;
+    border-left:3px solid var(--accent-start); background:var(--bg-secondary);
+    border-radius:0 var(--radius-sm) var(--radius-sm) 0; color:var(--text-primary); font-weight:600;
+  }
+  thead th.num { text-align:right; }
+  tbody td { padding:9px 12px; border-bottom:1px solid var(--border); font-size:var(--fs-base); color:var(--text-secondary); vertical-align:middle; }
+  tbody tr { border-left:2px solid transparent; }
+  tbody tr:hover td { background:var(--bg-card-hover); }
+  tbody tr:hover { border-left-color:var(--accent-start); }
+  tbody tr:last-child td { border-bottom:none; }
+  td.num { text-align:right; font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+  .rank { font-family:var(--font-mono); color:var(--text-muted); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .proj { font-family:var(--font-mono); font-size:var(--fs-base); color:var(--text-primary); font-weight:600; display:block; max-width:18ch; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .proj.muted { font-weight:400; color:var(--text-secondary); }
+  thead th:nth-child(2), tbody td:nth-child(2) { padding-right:16px; }
+  .tool-badge {
+    display:inline-block; margin-top:3px; font-family:var(--font-mono); font-size:var(--fs-2xs); font-weight:700; text-transform:uppercase;
+    letter-spacing:0.04em; color:var(--text-secondary); background:var(--chip-bg); border:1px solid var(--border);
+    padding:1px 6px; border-radius:var(--radius-sm);
+  }
+  .tool-badge.flush { margin-top:0; }
+  .unit { font-family:var(--font-mono); font-size:var(--fs-base); color:var(--text-primary); display:block; min-width:24ch; max-width:34ch; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .unit .mod { color:var(--text-muted); }
+  /* The module disambiguator, shown only where two findings share a display name. Its own line
+     because nothing fits inside .unit's cap — a Maven goal path already overruns it. It carries
+     whichever half of `groupId:artifactId` separates that particular clash: the artifactId where the
+     colliding modules share a group id, the whole coordinate where they share an artifactId instead.
+     The full coordinate rides in data-tip, which bindTips reads out on hover and focus — hence the
+     explicit tabindex, since markTruncated only stamps one onto .elide. Not in `title`, which would
+     stack a second native tooltip under this one, and not via .elide: that hook shows an element's
+     own text, and only once it is truncated, so in artifact mode it would echo the artifactId and
+     never reveal the group. */
+  .modline { display:block; margin-top:3px; font-family:var(--font-mono); font-size:var(--fs-sm);
+             color:var(--text-muted); max-width:34ch; white-space:nowrap; overflow:hidden;
+             text-overflow:ellipsis; }
+  .inv { font-family:var(--font-mono); font-size:var(--fs-sm); color:var(--text-muted); display:inline-block; min-width:20ch; max-width:22ch; overflow-wrap:anywhere; }
+  .inv-copy { cursor:pointer; }
+  .inv-copy:hover { color:var(--text-secondary); }
+  .inv-more { color:var(--text-muted); white-space:nowrap; }
+  .inv-copy:hover .inv-more { color:var(--text-primary); }
+
+  /* Padding is 1px short on each side to offset the border: the box has to stay the height it was,
+     or anything packing pills into a fixed-height row reflows. */
+  .pill { display:inline-flex; align-items:center; gap:6px; font-family:var(--font-mono); font-size:var(--fs-sm); font-weight:700; text-transform:uppercase; letter-spacing:0.03em; padding:1px 8px; border:1px solid transparent; border-radius:999px; white-space:nowrap; }
+  .pill.volatile { background:rgba(222,173,34,0.16); border-color:rgba(216,164,0,0.38); color:var(--text-primary); }
+  .pill.nonreloc { background:rgba(6,159,206,0.10); border-color:rgba(6,159,206,0.30); color:var(--link-strong); }
+  .reach { display:block; margin-top:3px; font-family:var(--font-mono); font-size:var(--fs-sm); color:var(--link); }
+  .reach.bundled { cursor:help; text-decoration:underline dotted; text-underline-offset:3px; }
+  .has-tip { cursor:help; text-decoration:underline dotted; text-underline-offset:3px; text-decoration-color:var(--border-hover); }
+  .pill[data-tip] { cursor:help; }
+
+  /* How recently the row was last seen costing anything, in its own column. The state word is on
+     every row, so the dot is never the only channel. A filled circle, not a split or hollow one: a
+     partly-filled glyph invites reading the fill as a quantity, and a fully-closed ring reads
+     psychologically as done.
+
+     Only "Recent" carries the dot. Its one job is to catch the eye of a reader scanning the column
+     for the rows worth looking at first, and it encodes no scale — a second dot in a second colour
+     beside "Dormant" would make the pair read as a two-point scale. */
+  td.seen { white-space:nowrap; }
+  td.seen > span { display:inline-flex; align-items:center; cursor:help; }
+  .rdot { width:10px; height:10px; border-radius:999px; flex-shrink:0; display:inline-block; }
+  .rdot.recent { background:var(--recency-recent); }
+  /* A dotless row keeps the dot's place, so the column's words share one left edge and the dot is
+     the only thing that varies down it. It draws nothing. */
+  .seen-nodot { width:10px; flex-shrink:0; display:inline-block; }
+  .seen-state { font-size:var(--fs-2xs); color:var(--text-muted); margin-left:7px; white-space:nowrap; }
+
+  .cost { min-width:120px; }
+  .cost .figline { display:flex; align-items:baseline; gap:4px; justify-content:flex-end; }
+  .cost .fig { font-family:var(--font-mono); font-weight:700; font-size:var(--fs-md); color:var(--text-primary); font-variant-numeric:tabular-nums; }
+  .cost .u { font-family:var(--font-mono); font-size:var(--fs-2xs); color:var(--text-muted); }
+  .cost .bar { margin-top:5px; height:6px; border-radius:3px; background:var(--chip-bg); overflow:hidden; }
+  .cost .bar > i { display:block; height:100%; border-radius:3px; background:var(--accent-grad); }
+  .cost.estimate .fig { color:var(--estimate); }
+  .cost.estimate .bar > i { background:var(--estimate); }
+
+  /* A remote Build Cache adoption row: tinted so it reads as an estimate beside the measured rows, as the tile
+     line under the measured figure in "Recoverable CI time" is. */
+  tbody tr.sp-row td { background:var(--estimate-bg); }
+  tbody tr.sp-row:hover { border-left-color:var(--estimate); }
+  .pill.estimate { background:rgba(107,91,181,0.10); border-color:rgba(107,91,181,0.32); color:var(--estimate); }
+  /* The adoption rows' badge and button may wrap: on one line each, they widened the table by about
+     220px and made the page scroll sideways on a laptop window. The cache-miss rows' labels are short. */
+  .pill.estimate { white-space:normal; border-radius:10px; }
+  td.fix .fix-btn { white-space:normal; }
+  .table-foot { padding:10px 16px; border-top:1px solid var(--border); font-size:var(--fs-sm); color:var(--text-muted); }
+  .table-foot p + p { margin-top:4px; }
+
+  .scan { font-family:var(--font-mono); font-size:var(--fs-sm); }
+  .scan .ext { margin-left:5px; vertical-align:-1px; opacity:0.7; }
+  .scan a:hover .ext { opacity:1; }
+  .scan .hit { white-space:nowrap; }
+  .scan .sep { color:var(--text-muted); padding:0 4px; }
+
+  /* Not pinned: the column pinned itself when the table carried eleven columns and always
+     overflowed. Folding the detail into expandable rows left six, so it now fits at most widths —
+     and where it still overflows, a pinned Fix column sits on top of Recoverable, the figure the
+     reader ranks on, with no scroll affordance to say so. */
+  th.fix, td.fix { border-left:1px solid var(--border); }
+  .op-row { cursor:pointer; }
+  .exp-toggle {
+    display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; margin-right:4px;
+    padding:0; background:none; border:0; border-radius:4px; cursor:pointer; color:var(--text-muted); vertical-align:-5px;
+  }
+  .exp-toggle:hover { background:var(--bg-secondary); color:var(--text-primary); }
+  .exp-toggle svg { transition:transform .15s; }
+  .op-row.open .exp-toggle svg { transform:rotate(90deg); }
+  tr.expand-row td { padding:0; border-bottom:0; }
+  tr.expand-row:hover td { background:transparent; }
+  tr.op-row.open td { border-bottom:0; }
+  .detail { padding:2px 12px 14px 44px; border-bottom:1px solid var(--border); background:var(--bg-secondary); }
+  .detail-grid { display:grid; grid-template-columns:max-content 1fr; gap:7px 16px; padding-top:12px; }
+  .detail-label { font-size:var(--fs-sm); color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; white-space:nowrap; padding-top:1px; }
+  .detail-value { font-size:var(--fs-base); color:var(--text-secondary); overflow-wrap:anywhere; }
+  .detail-value .inv { max-width:none; }
+  .detail-value .member { font-family:var(--font-mono); display:block; }
+  tr.paged-out { display:none; }
+  tr.paged-out + tr.expand-row { display:none; }
+  .pager { display:flex; justify-content:flex-end; align-items:center; gap:4px; padding:10px 12px; border-top:1px solid var(--border); }
+  .pager button {
+    min-width:28px; height:26px; padding:0 8px; font-family:var(--font-mono); font-size:var(--fs-sm);
+    background:var(--bg-card); color:var(--text-secondary); border:1px solid var(--border); border-radius:var(--radius-sm); cursor:pointer;
+  }
+  .pager button:hover:not(:disabled) { border-color:var(--border-hover); color:var(--text-primary); }
+  .pager button[aria-current="page"] { background:var(--chip-bg); color:var(--text-primary); font-weight:700; }
+  .pager button:disabled { opacity:0.4; cursor:default; }
+  @media print {
+    .detail[hidden] { content-visibility:visible !important; display:block !important; }
+    .exp-toggle { display:none; }
+  }
+  /* A remote Build Cache adoption row's Fix is a link styled as the cache-miss rows' button, so the column reads
+     as one action per row. */
+  .copy, .fix-btn {
+    font-family:var(--font-mono); font-size:var(--fs-sm); font-weight:700; cursor:pointer;
+    color:var(--text-secondary); background:var(--bg-card); border:1px solid var(--border);
+    border-radius:var(--radius-sm); padding:5px 9px; display:inline-flex; align-items:center; gap:6px; white-space:nowrap;
+    transition:border-color .15s, color .15s, box-shadow .3s;
+  }
+  .copy:hover, .fix-btn:hover { border-color:var(--border-hover); color:var(--text-primary); }
+  .fix-btn { text-decoration:none; }
+  .fix-btn .ext { vertical-align:-1px; opacity:0.7; }
+  .fix-btn:hover .ext { opacity:1; }
+  .copy.done { color:var(--status-pass); border-color:var(--status-pass); box-shadow:0 0 10px rgba(25,170,93,0.25); }
+
+  /* ── COVERAGE ───────────────────────────── */
+  .cov { padding:16px; font-size:var(--fs-base); color:var(--text-secondary); line-height:1.6; }
+  .cov b { color:var(--text-primary); font-weight:700; }
+  .foot-block { margin-bottom:14px; }
+  .foot-block:last-child { margin-bottom:0; }
+  .foot-label {
+    font-family:var(--font-mono); font-size:var(--fs-sm); font-weight:600; text-transform:uppercase;
+    letter-spacing:0.06em; color:var(--text-secondary); margin-bottom:4px;
+  }
+  .cov .named { font-family:var(--font-mono); font-size:var(--fs-sm); color:var(--text-muted); }
+  .cov .named b { color:var(--text-secondary); font-weight:600; }
+  .cov .remedy { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 10px; }
+  .cov .remedy .label { font-weight:700; color:var(--text-primary); }
+  .cov .remedy .who { color:var(--text-muted); }
+  .cov .remedy-note { color:var(--text-muted); }
+  .cov .doclink { font-family:var(--font-mono); font-size:var(--fs-sm); }
+  .cov .doclink .ext { margin-left:4px; vertical-align:-1px; opacity:0.7; }
+  .cov .doclink:hover .ext { opacity:1; }
+  .cov .cov-note { color:var(--text-muted); }
+
+  /* ── REPORT FOOTER ──────────────────────── */
+  /* The skill version that produced this report: below the cards, set off by a rule and muted.
+     The label reads "Version" alone. "Skill" is internal vocabulary, and it stays out of every
+     text a reader sees. The summary's version line reads the same way. */
+  .report-footer {
+    margin-top:20px; padding-top:14px; border-top:1px solid var(--border);
+    font-size:var(--fs-sm); color:var(--text-muted);
+  }
+  .report-footer .rf-version { font-family:var(--font-mono); }
+
+  /* ── TOAST + MODAL ──────────────────────── */
+  /* The top offset must clear the sticky header and the scope strip below it. */
+  #toast {
+    position:fixed; top:calc(var(--header-h) + var(--strip-h) + 14px); left:50%; transform:translateX(-50%) translateY(-12px);
+    background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border);
+    font-family:var(--font-mono); font-size:var(--fs-base); font-weight:600; padding:10px 16px; border-radius:var(--radius);
+    box-shadow:0 8px 24px rgba(0,0,0,0.18); opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; z-index:60;
+  }
+  #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+  #tip {
+    /* Wide enough that a Maven goal path — `goal (executionId) @ Module Name`, a median of 55
+       characters and up to ~96 — mostly lands on one line. At 340px only a quarter of them did, and
+       a wrapped entry in a list is indistinguishable from the next entry. */
+    position:fixed; z-index:70; max-width:min(560px, 92vw); padding:8px 11px; border-radius:var(--radius);
+    background:var(--shell); color:#ffffff; font-family:var(--font-mono); font-size:var(--fs-sm);
+    line-height:1.55; white-space:pre-line; overflow-wrap:anywhere; box-shadow:0 8px 24px rgba(0,0,0,0.25);
+    opacity:0; pointer-events:none; transition:opacity .12s;
+  }
+  #tip.show { opacity:1; }
+  .modal-overlay { position:fixed; inset:0; z-index:80; display:flex; align-items:center; justify-content:center; padding:24px; background:rgba(2,48,58,0.4); backdrop-filter:blur(4px); }
+  .modal { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); box-shadow:0 20px 60px rgba(0,0,0,0.25); width:min(720px,100%); max-height:82vh; display:flex; flex-direction:column; overflow:hidden; }
+  .modal-head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; border-bottom:1px solid var(--border); }
+  .modal-head b { font-size:var(--fs-md); }
+  .modal-hint { padding:12px 16px 0; font-size:var(--fs-base); color:var(--text-secondary); }
+  .modal-hint kbd { font-family:var(--font-mono); font-size:var(--fs-xs); background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius-sm); padding:1px 5px; margin:0 1px; }
+  #modalText { margin:12px 16px 16px; font-family:var(--font-mono); font-size:var(--fs-base); line-height:1.55; color:var(--text-secondary); background:var(--bg-secondary); border:1px solid var(--border); border-radius:var(--radius); padding:12px; resize:none; height:340px; white-space:pre; overflow:auto; }
+
+  .hidden { display:none !important; }
+
+  /* ── ENTRANCE ANIMATIONS ────────────────── */
+  @keyframes fade-up { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+  .metric-card { animation:fade-up .25s ease-out both; }
+  .metrics-grid .metric-card:nth-child(2){ animation-delay:.05s; }
+  .metrics-grid .metric-card:nth-child(3){ animation-delay:.1s; }
+  .metrics-grid .metric-card:nth-child(4){ animation-delay:.15s; }
+  .section .card { animation:fade-up .3s ease-out .1s both; }
+  @media (prefers-reduced-motion:reduce) { * { animation:none !important; transition:none !important; } }
+
+  @media (max-width:1100px) {
+    .metrics-grid { grid-template-columns:repeat(2,1fr); }
+  }
+  @media (max-width:620px) { .metrics-grid { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+  <!-- Fill point: the detection skill replaces the {} below with the run's payload. -->
+  <script id="report-data" type="application/json">{"meta": {"instance": "ge.gradle.org", "window_start": "2026-11-09", "window_end": "2026-11-15", "generated": "2026-11-16", "candidates_detected": 2166, "confirmation_target": 30, "skill_version": "2026.3.5-58d6d2fdff0d", "projects_total": 15, "projects_inspected": 10, "projects_partially_inspected": 2, "projects_skipped": 3, "projects_without_remote_cache": 2, "projects_without_commit_id": 1, "projects_without_input_capture": 0, "projects_skipped_named": ["nowinandroid", "native-platform", "compatibility-plugin"], "projects_partially_inspected_named": ["gradle (no commit id on some builds)", "gradle-fileevents (no commit id on some builds)"], "projects_without_remote_cache_named": ["native-platform", "compatibility-plugin"], "projects_without_commit_id_named": ["nowinandroid"], "cache_miss_detection_skipped": false, "remote_cache_adoption_rest_rows": 0, "remote_cache_adoption_rest_ci_hours": 0.0, "projects_with_remote_cache_adoption": 2, "projects_without_remote_cache_below_floor": 0}, "records": [{"state": "confirmed", "project": "gradle", "build_tool": "gradle", "work_unit": ":performance:largeJavaMultiProjectPerformanceTest", "build_invocation": "clean :performance:largeJavaMultiProjectPerformanceTest", "classification": "volatile", "root_cause_hint": "the compiled Groovy performance-test classes are not byte-reproducible, so the class-file input differs at one commit", "diverging_input": "testing/performance/build/classes/groovy/performanceTest", "unit_ref": ":performance:largeJavaMultiProjectPerformanceTest", "wasted_ci_hours": 532.9, "last_diverged": "2026-11-15", "severity_distinct_keys": 1613, "diverging_commits": 97, "evidence": {"miss_build": "rs42rnv6khjlw", "hit_build": "22ejkzr44ysgk"}}, {"state": "confirmed", "project": "gradle", "build_tool": "gradle", "work_unit": ":performance:largeMonolithicJavaProjectPerformanceTest", "build_invocation": "clean :performance:largeMonolithicJavaProjectPerformanceTest", "classification": "volatile", "root_cause_hint": "the compiled Groovy performance-test classes are not byte-reproducible, so the class-file input differs at one commit", "diverging_input": "testing/performance/build/classes/groovy/performanceTest", "unit_ref": ":performance:largeMonolithicJavaProjectPerformanceTest", "wasted_ci_hours": 243.7, "last_diverged": "2026-11-15", "severity_distinct_keys": 679, "diverging_commits": 92, "evidence": {"miss_build": "2hsqgymq3g224", "hit_build": "aqgzrd776yzhy"}}, {"state": "confirmed", "project": "gradle", "build_tool": "gradle", "work_unit": ":configuration-cache:noDaemonIntegTest", "build_invocation": "clean configuration-cache:noDaemonTest", "classification": "build-variant", "root_cause_hint": "only test-selection values (exclude patterns, tags, system properties) differ across all three sampled pairs", "unit_ref": ":configuration-cache:noDaemonIntegTest", "wasted_ci_hours": 228.7, "last_diverged": "2026-11-14", "severity_distinct_keys": 194, "diverging_commits": 26, "evidence": {"miss_build": "mqf6bhufcej2y", "hit_build": "kovrjftlshq7a"}}, {"state": "confirmed", "project": "gradle", "build_tool": "gradle", "work_unit": ":dependency-management:noDaemonIntegTest", "build_invocation": "clean dependency-management:noDaemonTest", "classification": "build-variant", "root_cause_hint": "only the test exclude-pattern value differs, which per-job test selection sets", "unit_ref": ":dependency-management:noDaemonIntegTest", "wasted_ci_hours": 191.1, "last_diverged": "2026-11-14", "severity_distinct_keys": 189, "diverging_commits": 23, "evidence": {"miss_build": "jx2cp2vqgagc4", "hit_build": "ognghzvfedhvs"}}, {"state": "confirmed", "project": "gradle", "build_tool": "gradle", "work_unit": ":dependency-management:forkingIntegTest", "build_invocation": "clean dependency-management:platformTest", "classification": "build-variant", "root_cause_hint": "only the test exclude-pattern value differs, which per-job test selection sets", "unit_ref": ":dependency-management:forkingIntegTest", "wasted_ci_hours": 185.9, "last_diverged": "2026-11-15", "severity_distinct_keys": 552, "diverging_commits": 78, "evidence": {"miss_build": "7erm7i7nnxsiu", "hit_build": "cjwvzggkmw5qa"}}, {"state": "confirmed", "project": "gradle", "build_tool": "gradle", "work_unit": ":configuration-cache:forkingIntegTest", "build_invocation": "clean configuration-cache:platformTest", "classification": "build-variant", "root_cause_hint": "only the test exclude-pattern value differs, which per-job test selection sets", "unit_ref": ":configuration-cache:forkingIntegTest", "wasted_ci_hours": 172.6, "last_diverged": "2026-11-15", "severity_distinct_keys": 491, "diverging_commits": 84, "evidence": {"miss_build": "uatcjcrd2bpqe", "hit_build": "2r4dikw2qwa42"}}, {"state": "confirmed", "project": "gradle", "build_tool": "gradle", "work_unit": ":core:noDaemonIntegTest", "build_invocation": "clean core:noDaemonTest", "classification": "build-variant", "root_cause_hint": "only test-selection values (exclude patterns, tags, system properties) differ", "unit_ref": ":core:noDaemonIntegTest", "wasted_ci_hours": 156.6, "last_diverged": "2026-11-14", "severity_distinct_keys": 151, "diverging_commits": 23, "evidence": {"miss_build": "7ulvki27v2i5w", "hit_build": "o2nflq3smqhzq"}}, {"state": "confirmed", "project": "gradle", "build_tool": "gradle", "work_unit": ":performance:nowInAndroidBuildPerformanceTest", "build_invocation": "clean :performance:nowInAndroidBuildPerformanceTest", "classification": "volatile", "root_cause_hint": "the compiled Groovy performance-test classes are not byte-reproducible, so the class-file input differs at one commit", "diverging_input": "testing/performance/build/classes/groovy/performanceTest", "unit_ref": ":performance:nowInAndroidBuildPerformanceTest", "wasted_ci_hours": 156.6, "last_diverged": "2026-11-15", "severity_distinct_keys": 494, "diverging_commits": 92, "evidence": {"miss_build": "5fzjjvwa7hj3u", "hit_build": "morwcwbw2golq"}}, {"state": "confirmed", "project": "gradle", "build_tool": "gradle", "work_unit": ":docs:docsTest", "build_invocation": "clean docs:docsTest docs:checkSamples", "classification": "build-variant", "root_cause_hint": "only test include/exclude patterns and system properties differ, which per-job test selection sets", "unit_ref": ":docs:docsTest", "wasted_ci_hours": 120.3, "last_diverged": "2026-11-15", "severity_distinct_keys": 372, "diverging_commits": 85, "evidence": {"miss_build": "55utkv2n7x7lc", "hit_build": "3niwna3lau22g"}}, {"state": "confirmed", "project": "gradle", "build_tool": "gradle", "work_unit": ":core:forkingIntegTest", "build_invocation": "clean core:platformTest", "classification": "build-variant", "root_cause_hint": "only the test exclude-pattern value differs, which per-job test selection sets", "unit_ref": ":core:forkingIntegTest", "wasted_ci_hours": 114.8, "last_diverged": "2026-11-15", "severity_distinct_keys": 348, "diverging_commits": 80, "evidence": {"miss_build": "cicje5boy6j52", "hit_build": "6aa276wdina6c"}}, {"state": "confirmed", "project": "gradle", "build_tool": "gradle", "work_unit": ":dependency-management:embeddedIntegTest", "build_invocation": "clean dependency-management:quickTest", "classification": "build-variant", "root_cause_hint": "only the test exclude-pattern value differs, which per-job test selection sets", "unit_ref": ":dependency-management:embeddedIntegTest", "wasted_ci_hours": 102.9, "last_diverged": "2026-11-15", "severity_distinct_keys": 469, "diverging_commits": 80, "evidence": {"miss_build": "khzioleqbwc44", "hit_build": "ktqi32an6r35q"}}, {"state": "confirmed", "project": "gradle", "build_tool": "gradle", "work_unit": ":performance:largeAndroidBuildPerformanceTest", "build_invocation": "clean :performance:largeAndroidBuildPerformanceTest", "classification": "volatile", "root_cause_hint": "the compiled Groovy performance-test classes are not byte-reproducible, so the class-file input differs at one commit", "diverging_input": "testing/performance/build/classes/groovy/performanceTest", "unit_ref": ":performance:largeAndroidBuildPerformanceTest", "wasted_ci_hours": 89.4, "last_diverged": "2026-11-15", "severity_distinct_keys": 286, "diverging_commits": 80, "evidence": {"miss_build": "k7kszpbo2dazo", "hit_build": "h6mtxjvbxkg4a"}}, {"state": "confirmed", "project": "gradle", "build_tool": "gradle", "work_unit": ":smoke-test:configCacheSmokeTest", "build_invocation": "clean :smoke-test:configCacheSmokeTest", "classification": "build-variant", "root_cause_hint": "only test selection and the JVM-version matrix values differ, which per-job settings choose", "unit_ref": ":smoke-test:configCacheSmokeTest", "wasted_ci_hours": 76.1, "last_diverged": "2026-11-15", "severity_distinct_keys": 706, "diverging_commits": 103, "evidence": {"miss_build": "osahj5u6zl6c4", "hit_build": "ymmkbezim4gda"}}, {"state": "confirmed", "project": "gradle", "build_tool": "gradle", "work_unit": ":tooling-api:embeddedCrossVersionTest", "build_invocation": "clean tooling-api:quickTest", "classification": "build-variant", "root_cause_hint": "only the test exclude-pattern value differs, which per-job test selection sets", "unit_ref": ":tooling-api:embeddedCrossVersionTest", "wasted_ci_hours": 69.4, "last_diverged": "2026-11-15", "severity_distinct_keys": 417, "diverging_commits": 80, "evidence": {"miss_build": "ewbdknkyyy3da", "hit_build": "rrmeytqi6mrky"}}, {"state": "confirmed", "project": "gradle", "build_tool": "gradle", "work_unit": ":configuration-cache:embeddedIntegTest", "build_invocation": "clean configuration-cache:quickTest", "classification": "build-variant", "root_cause_hint": "only the test exclude-pattern value differs, which per-job test selection sets", "unit_ref": ":configuration-cache:embeddedIntegTest", "wasted_ci_hours": 63.9, "last_diverged": "2026-11-15", "severity_distinct_keys": 312, "diverging_commits": 80, "evidence": {"miss_build": "7z32wwyq6ijtm", "hit_build": "etqpilkgh255u"}}, {"state": "confirmed", "project": "gradle", "build_tool": "gradle", "work_unit": ":smoke-test:smokeTest", "build_invocation": "clean :smoke-test:smokeTest", "classification": "build-variant", "root_cause_hint": "only the exclude pattern and the JVM-version matrix values differ, which per-job settings choose", "unit_ref": ":smoke-test:smokeTest", "wasted_ci_hours": 63.4, "last_diverged": "2026-11-15", "severity_distinct_keys": 448, "diverging_commits": 99, "evidence": {"miss_build": "b4wuwjhtaanqy", "hit_build": "hwsbrle7qyrvc"}}, {"state": "confirmed", "project": "gradle", "build_tool": "gradle", "work_unit": ":performance:largeJavaMultiProjectKotlinDslPerformanceTest", "build_invocation": "clean :performance:largeJavaMultiProjectKotlinDslPerformanceTest", "classification": "build-variant", "root_cause_hint": "only the --tests include pattern differs, which per-scenario jobs select", "unit_ref": ":performance:largeJavaMultiProjectKotlinDslPerformanceTest", "wasted_ci_hours": 63.1, "last_diverged": "2026-11-14", "severity_distinct_keys": 101, "diverging_commits": 32, "evidence": {"miss_build": "datpgk2xbb6kw", "hit_build": "v4ithml7esey6"}}, {"state": "confirmed", "project": "gradle", "build_tool": "gradle", "work_unit": ":performance:largeJavaMultiProjectNoBuildSrcPerformanceTest", "build_invocation": "clean :performance:largeJavaMultiProjectNoBuildSrcPerformanceTest", "classification": "build-variant", "root_cause_hint": "only the baselines and --tests include pattern differ, which per-scenario jobs select", "unit_ref": ":performance:largeJavaMultiProjectNoBuildSrcPerformanceTest", "wasted_ci_hours": 47.2, "last_diverged": "2026-11-15", "severity_distinct_keys": 120, "diverging_commits": 79, "evidence": {"miss_build": "ettz3qejbwlpg", "hit_build": "lalbkahurtyya"}}, {"state": "confirmed", "project": "gradle", "build_tool": "gradle", "work_unit": ":performance:excludeRuleMergingBuildPerformanceTest", "build_invocation": "clean :performance:excludeRuleMergingBuildPerformanceTest", "classification": "volatile", "root_cause_hint": "the compiled Groovy performance-test classes are not byte-reproducible, so the class-file input differs at one commit", "diverging_input": "testing/performance/build/classes/groovy/performanceTest", "unit_ref": ":performance:excludeRuleMergingBuildPerformanceTest", "wasted_ci_hours": 39.6, "last_diverged": "2026-11-15", "severity_distinct_keys": 86, "diverging_commits": 74, "evidence": {"miss_build": "3k2lpxtceqpzk", "hit_build": "scf2ckyuhbqtq"}}, {"state": "confirmed", "project": "gradle", "build_tool": "gradle", "work_unit": ":performance:mediumSwiftMultiPerformanceTest", "build_invocation": "clean :performance:mediumSwiftMultiPerformanceTest", "classification": "build-variant", "root_cause_hint": "only the baselines value differs, which per-scenario jobs select", "unit_ref": ":performance:mediumSwiftMultiPerformanceTest", "wasted_ci_hours": 32.8, "last_diverged": "2026-11-14", "severity_distinct_keys": 38, "diverging_commits": 32, "evidence": {"miss_build": "cvkkpegjeg3cm", "hit_build": "hrqwhsz5g7mcw"}}, {"state": "confirmed", "project": "gradle", "build_tool": "gradle", "work_unit": ":performance:archivePerformanceProjectPerformanceTest", "build_invocation": "clean :performance:archivePerformanceProjectPerformanceTest", "classification": "build-variant", "root_cause_hint": "only the baselines value differs, which per-scenario jobs select", "unit_ref": ":performance:archivePerformanceProjectPerformanceTest", "wasted_ci_hours": 25.8, "last_diverged": "2026-11-15", "severity_distinct_keys": 114, "diverging_commits": 78, "evidence": {"miss_build": "7yf7i3efmpsky", "hit_build": "3dyj5ekawgtgo"}}, {"state": "confirmed", "project": "gradle", "build_tool": "gradle", "work_unit": ":performance:nativeMonolithicPerformanceTest", "build_invocation": "clean :performance:nativeMonolithicPerformanceTest", "classification": "volatile", "root_cause_hint": "the compiled Groovy performance-test classes are not byte-reproducible, so the class-file input differs at one commit", "diverging_input": "testing/performance/build/classes/groovy/performanceTest", "unit_ref": ":performance:nativeMonolithicPerformanceTest", "wasted_ci_hours": 25.8, "last_diverged": "2026-11-15", "severity_distinct_keys": 86, "diverging_commits": 75, "evidence": {"miss_build": "37hl6njzeofwq", "hit_build": "dtr22qq3hev3a"}}, {"state": "confirmed", "project": "gradle", "build_tool": "gradle", "work_unit": ":performance:nativeMonolithicOverlappingPerformanceTest", "build_invocation": "clean :performance:nativeMonolithicOverlappingPerformanceTest", "classification": "volatile", "root_cause_hint": "the compiled Groovy performance-test classes are not byte-reproducible, so the class-file input differs at one commit", "diverging_input": "testing/performance/build/classes/groovy/performanceTest", "unit_ref": ":performance:nativeMonolithicOverlappingPerformanceTest", "wasted_ci_hours": 24.1, "last_diverged": "2026-11-15", "severity_distinct_keys": 85, "diverging_commits": 72, "evidence": {"miss_build": "3lcqtxvrqpgu4", "hit_build": "du6q46rlpokxi"}}, {"state": "confirmed", "project": "gradle", "build_tool": "gradle", "work_unit": ":performance:nativeDependentsPerformanceTest", "build_invocation": "clean :performance:nativeDependentsPerformanceTest", "classification": "volatile", "root_cause_hint": "the compiled Groovy performance-test classes are not byte-reproducible, so the class-file input differs at one commit", "diverging_input": "testing/performance/build/classes/groovy/performanceTest", "unit_ref": ":performance:nativeDependentsPerformanceTest", "wasted_ci_hours": 22.2, "last_diverged": "2026-11-15", "severity_distinct_keys": 86, "diverging_commits": 74, "evidence": {"miss_build": "zehubndgeood2", "hit_build": "64kn5yvi5q7g6"}}, {"state": "confirmed", "project": "gradle", "build_tool": "gradle", "work_unit": ":performance:largeMonolithicGroovyProjectPerformanceTest", "build_invocation": "clean :performance:largeMonolithicGroovyProjectPerformanceTest", "classification": "volatile", "root_cause_hint": "the compiled Groovy performance-test classes are not byte-reproducible, so the class-file input differs at one commit", "diverging_input": "testing/performance/build/classes/groovy/performanceTest", "unit_ref": ":performance:largeMonolithicGroovyProjectPerformanceTest", "wasted_ci_hours": 21.9, "last_diverged": "2026-11-14", "severity_distinct_keys": 38, "diverging_commits": 28, "evidence": {"miss_build": "26jtqmesnd6a6", "hit_build": "xchvtxu6cxr6k"}}, {"state": "confirmed", "project": "gradle", "build_tool": "gradle", "work_unit": ":performance:santaTrackerAndroidBuildPerformanceTest", "build_invocation": "clean :performance:santaTrackerAndroidBuildPerformanceTest", "classification": "volatile", "root_cause_hint": "the compiled Groovy performance-test classes are not byte-reproducible, so the class-file input differs at one commit", "diverging_input": "testing/performance/build/classes/groovy/performanceTest", "unit_ref": ":performance:santaTrackerAndroidBuildPerformanceTest", "wasted_ci_hours": 21.8, "last_diverged": "2026-11-13", "severity_distinct_keys": 68, "diverging_commits": 9, "evidence": {"miss_build": "ch4imbw2vfqve", "hit_build": "3gyo66zw57whu"}}, {"state": "confirmed", "project": "gradle", "build_tool": "gradle", "work_unit": ":performance:bigCppMultiPerformanceTest", "build_invocation": "clean :performance:bigCppMultiPerformanceTest", "classification": "build-variant", "root_cause_hint": "only the baselines and --tests include pattern differ, which per-scenario jobs select", "unit_ref": ":performance:bigCppMultiPerformanceTest", "wasted_ci_hours": 20.4, "last_diverged": "2026-11-14", "severity_distinct_keys": 37, "diverging_commits": 28, "evidence": {"miss_build": "6ofdrqxnbasqu", "hit_build": "cxledq7ktqasi"}}, {"state": "confirmed", "project": "gradle", "build_tool": "gradle", "work_unit": ":performance:largeGroovyMultiProjectPerformanceTest", "build_invocation": "clean :performance:largeGroovyMultiProjectPerformanceTest", "classification": "volatile", "root_cause_hint": "the compiled Groovy performance-test classes are not byte-reproducible, so the class-file input differs at one commit", "diverging_input": "testing/performance/build/classes/groovy/performanceTest", "unit_ref": ":performance:largeGroovyMultiProjectPerformanceTest", "wasted_ci_hours": 19.1, "last_diverged": "2026-11-15", "severity_distinct_keys": 75, "diverging_commits": 69, "evidence": {"miss_build": "7bmpdkuia27fw", "hit_build": "bffzppnqrv4s6"}}], "remote_cache_adoption": [{"project": "native-platform", "build_tool": "gradle", "estimated_ci_hours": 1.4, "builds": 78, "top_types": ["org.gradle.api.tasks.compile.JavaCompile", "org.gradle.language.cpp.tasks.CppCompile", "org.gradle.api.tasks.compile.GroovyCompile"]}, {"project": "compatibility-plugin", "build_tool": "gradle", "estimated_ci_hours": 1.0, "builds": 7, "top_types": ["org.gradle.api.tasks.testing.Test", "org.gradle.api.tasks.compile.JavaCompile", "org.gradle.api.plugins.quality.Checkstyle"]}], "derived": {"window_days": 7, "unit_nouns": {"singular": "Gradle task", "plural": "Gradle tasks"}, "ranking_notes": ["Remote Build Cache adoption rows are ordered on the CI time per week the remote Build Cache would save, which is an estimate.", "Avoidable cache misses take their place in the same order, on recoverable CI time alone.", "Gradle tasks in the same project that one fix repairs are bundled into one opportunity, and the row ranks on the bundle's total."], "rate_note": "The recoverable CI time of the shown savings opportunities, stated per week.", "rate_window_note": "measured over 7 days, scaled to a week", "reach_total": "11 Gradle tasks", "opportunities": [{"representative": 0, "members": [0, 1, 7, 11, 18, 21, 22, 23, 24, 25, 27], "reach_units": 11, "reach": "11 Gradle tasks", "recoverable_hours_per_week": 1197.1, "last_diverged": {"date": "2026-11-15", "days_ago": 0, "stale": false, "state": "Recent", "note": "Last seen on 2026-11-15, the last day of the window. This window is 7 days, and every distance here is measured from its end rather than from today. That day is in the recent half of the window, so the rate this row quotes still describes live waste."}, "problem": "volatile (an input is not reproducible between builds)", "evidence_link": "https://ge.gradle.org/c/rs42rnv6khjlw/22ejkzr44ysgk/task-inputs", "prompt": "/develocity-build-caching-optimizer Analyze the invocation \"clean :performance:largeJavaMultiProjectPerformanceTest\", focusing on :performance:largeJavaMultiProjectPerformanceTest — one fix here reaches 11 Gradle tasks."}], "coverage": {"detected": 2166, "target": 30, "inspected": 28, "opportunities": 11, "opportunity_groups": 1, "undetermined": 0, "ruled_out": 17, "not_inspected": 2138, "stopped_at_target": false, "inspected_units": "28 Gradle tasks", "detected_units": "2166 candidates", "target_ending": {"clause": "fell short of its target of 30 confirmed misses", "reason": "", "sentence": "This run fell short of its target of 30 confirmed misses.", "ran_out": false}}, "coverage_verdict": {"state": "complete", "skipped": 3, "partial": 2, "scope": {"total": 15, "analyzed": 10, "skipped": 3, "partial": 2}, "has_projects": true, "total": 15, "tools": ["gradle"]}, "instance_coverage": {"projects_total": 15, "projects_inspected": 10, "projects_partially_inspected": 2, "projects_skipped": 3, "skipped_named": "nowinandroid, native-platform, compatibility-plugin", "partially_inspected_named": "gradle (no commit id on some builds), gradle-fileevents (no commit id on some builds)"}, "remedies": [{"key": "projects_without_remote_cache", "label": "Enable remote Build Cache", "projects": 2, "named": "native-platform, compatibility-plugin", "links": [{"tool": "Gradle", "url": "https://gradle.com/help/gradle-plugin-getting-started#build_cache"}, {"tool": "Maven", "url": "https://gradle.com/help/maven-extension-getting-started#build_cache"}], "note": "The remote Build Cache adoption rows estimate what enabling it would save."}, {"key": "projects_without_commit_id", "label": "Record a commit id on every build", "projects": 1, "named": "nowinandroid", "links": [{"tool": "Gradle", "url": "https://github.com/gradle/common-custom-user-data-gradle-plugin"}, {"tool": "Maven", "url": "https://github.com/gradle/common-custom-user-data-maven-extension"}]}], "remote_cache_adoption": {"row_kinds": "all", "rows": [{"project": "native-platform", "build_tool": "gradle", "unit_label": "All cacheable Gradle tasks", "label": "remote Build Cache disabled", "problem": "remote Build Cache disabled on CI", "note": "With the remote Build Cache enabled on CI, this project can be analyzed for avoidable cache misses after about a week of CI builds.", "estimate": "CI time spent re-running cacheable Gradle tasks whose cache key an earlier CI build already produced.", "rate": 1.4, "builds": 78, "top_types": ["org.gradle.api.tasks.compile.JavaCompile", "org.gradle.language.cpp.tasks.CppCompile", "org.gradle.api.tasks.compile.GroovyCompile"], "fix": {"tool": "Gradle", "url": "https://gradle.com/help/gradle-plugin-getting-started#build_cache"}, "builds_link": "https://ge.gradle.org/scans?search.query=project%3A%22native-platform%22%20tag%3ACI%20%28gradle.buildCache.remote.enabled%3Afalse%20or%20gradle.buildOptions.buildCacheEnabled%3Afalse%29%20-gradle.buildOptions.rerunTasksEnabled%20-gradle.buildOptions.refreshDependenciesEnabled&search.startTimeMin=1794182400000&search.startTimeMax=1794787199999&search.timeZoneId=UTC"}, {"project": "compatibility-plugin", "build_tool": "gradle", "unit_label": "All cacheable Gradle tasks", "label": "remote Build Cache disabled", "problem": "remote Build Cache disabled on CI", "note": "With the remote Build Cache enabled on CI, this project can be analyzed for avoidable cache misses after about a week of CI builds.", "estimate": "CI time spent re-running cacheable Gradle tasks whose cache key an earlier CI build already produced.", "rate": 1.0, "builds": 7, "top_types": ["org.gradle.api.tasks.testing.Test", "org.gradle.api.tasks.compile.JavaCompile", "org.gradle.api.plugins.quality.Checkstyle"], "fix": {"tool": "Gradle", "url": "https://gradle.com/help/gradle-plugin-getting-started#build_cache"}, "builds_link": "https://ge.gradle.org/scans?search.query=project%3A%22compatibility-plugin%22%20tag%3ACI%20%28gradle.buildCache.remote.enabled%3Afalse%20or%20gradle.buildOptions.buildCacheEnabled%3Afalse%29%20-gradle.buildOptions.rerunTasksEnabled%20-gradle.buildOptions.refreshDependenciesEnabled&search.startTimeMin=1794182400000&search.startTimeMax=1794787199999&search.timeZoneId=UTC"}], "total_per_week": 2.4, "projects": 2, "rest_note": "", "legend": "Purple rows and figures marked ~ hold estimates; the others hold measured, confirmed figures.", "tile_note": "The estimated figure is the CI time the remote Build Cache would save in the CI builds that run with it disabled, stated per week. It is never added to the measured figure, and it totals every remote Build Cache adoption row, the ones beyond the table included.", "tile_line": "remote Build Cache adoption, estimate", "floor_hours": "0.5", "adoption": {"total": 15, "without": 2, "neither": 1}}, "rows": [{"kind": "cache_miss", "index": 0}, {"kind": "remote_cache_adoption", "index": 0}, {"kind": "remote_cache_adoption", "index": 1}]}}</script>
+
+  <header class="header">
+    <div class="container">
+      <div class="brand-crumb">
+        <svg class="brand-logo" role="img" aria-label="Develocity" viewBox="0 0 304 51" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M299.428 40.4886C299.428 42.1328 303.491 40.9629 303.491 43.9194C303.491 45.5795 302.005 46.3858 300.471 46.3858C298.859 46.3858 297.198 45.5004 297.119 43.7297H299.143C299.222 44.4411 299.823 44.7731 300.392 44.7731C300.93 44.7731 301.436 44.4727 301.436 43.9194C301.436 42.5281 297.388 43.5399 297.388 40.6151C297.404 39.0657 298.795 38.2435 300.218 38.2435C301.673 38.2435 303.175 39.1131 303.301 40.8996H301.278C301.246 40.0933 300.724 39.7297 300.234 39.7297C299.823 39.7297 299.428 40.0143 299.428 40.4886Z" fill="currentColor"/>
+<path d="M286.184 37.2789C286.058 37.3263 285.915 37.3579 285.789 37.3579C285.394 37.3579 285.014 37.1208 284.84 36.7255C284.619 36.2038 284.872 35.603 285.394 35.3817C285.52 35.3342 285.662 35.3026 285.789 35.3026C286.2 35.3026 286.579 35.5398 286.737 35.935C286.959 36.4568 286.706 37.0734 286.184 37.2789ZM286.785 46.3223H284.761V38.3224H286.785V46.3223Z" fill="currentColor"/>
+<path d="M279.197 38.259C281.426 38.259 283.244 40.0614 283.244 42.3064V46.591C283.244 49.089 281.284 50.2906 279.292 50.2906C277.221 50.2906 275.134 49.01 275.134 46.591H277.158C277.158 47.8716 278.185 48.5198 279.213 48.5198C280.225 48.5198 281.221 47.8874 281.221 46.591V45.3262C280.588 46.0218 279.671 46.3855 278.754 46.3855C276.968 46.3855 275.134 45.0416 275.134 42.3064C275.134 40.0614 276.952 38.259 279.197 38.259ZM279.197 44.5199C280.304 44.5199 281.221 43.5238 281.221 42.3064C281.221 41.0891 280.304 40.093 279.197 40.093C278.074 40.093 277.158 41.0891 277.158 42.3064C277.158 43.5238 278.074 44.5199 279.197 44.5199Z" fill="currentColor"/>
+<path d="M270.133 38.2749C272.362 38.2749 274.181 40.0773 274.181 42.3223C274.181 44.5674 272.362 46.3855 270.133 46.3855C267.888 46.3855 266.07 44.5674 266.07 42.3223C266.07 40.0773 267.888 38.2749 270.133 38.2749ZM270.133 44.5357C271.24 44.5357 272.157 43.5397 272.157 42.3223C272.157 41.1049 271.24 40.1089 270.133 40.1089C269.011 40.1089 268.094 41.1049 268.094 42.3223C268.094 43.5397 269.011 44.5357 270.133 44.5357Z" fill="currentColor"/>
+<path d="M264.737 46.3225H262.713V34.9866H264.737V46.3225Z" fill="currentColor"/>
+<path d="M257.349 38.2749C259.578 38.2749 261.397 40.0773 261.397 42.3223C261.397 44.5674 259.578 46.3855 257.349 46.3855C255.104 46.3855 253.286 44.5674 253.286 42.3223C253.286 40.0773 255.104 38.2749 257.349 38.2749ZM257.349 44.5357C258.456 44.5357 259.373 43.5397 259.373 42.3223C259.373 41.1049 258.456 40.1089 257.349 40.1089C256.227 40.1089 255.31 41.1049 255.31 42.3223C255.31 43.5397 256.227 44.5357 257.349 44.5357Z" fill="currentColor"/>
+<path d="M250.073 46.3222V42.0219H250.089H250.073C250.073 40.6306 249.22 39.9665 248.366 39.9665C247.496 39.9665 246.611 40.6622 246.611 42.0219V46.3222H244.587V38.8756C244.587 38.5436 244.872 38.259 245.204 38.259C245.378 38.259 245.536 38.3223 245.662 38.4488L246.516 39.3341C247.164 38.6227 248.065 38.259 248.967 38.259C250.532 38.259 252.065 39.3499 252.065 41.6266H252.05L252.097 46.3222H250.073Z" fill="currentColor"/>
+<path d="M240.979 46.3225V42.0221C240.979 40.6308 240.126 39.9668 239.272 39.9668C238.402 39.9668 237.517 40.6624 237.517 42.0221V42.0063V46.3225H235.493V34.9866H237.517V39.2395C238.149 38.5913 239.019 38.2593 239.873 38.2593C241.438 38.2593 242.972 39.366 242.972 41.6269L243.003 46.3225H240.979Z" fill="currentColor"/>
+<path d="M230.283 44.5357C231.09 44.5357 231.785 44.0298 232.102 43.2867H234.22C233.793 45.0575 232.181 46.3855 230.283 46.3855C228.038 46.3855 226.22 44.5674 226.22 42.3223C226.22 40.0773 228.038 38.2749 230.283 38.2749C232.181 38.2749 233.793 39.5871 234.22 41.3737H232.102C231.785 40.6306 231.09 40.1089 230.283 40.1089C229.161 40.1089 228.244 41.1049 228.244 42.3223C228.244 43.5397 229.161 44.5357 230.283 44.5357Z" fill="currentColor"/>
+<path d="M209.923 35.2712H217.938V37.121H214.982V46.3226H212.879V37.121H209.923V35.2712Z" fill="currentColor"/>
+<path d="M197.343 46.3225H195.319V34.9866H197.343V46.3225Z" fill="currentColor"/>
+<path d="M191.779 34.9866H193.803V42.3541C193.803 44.5834 191.984 46.4015 189.755 46.4015C187.51 46.4015 185.692 44.5834 185.692 42.3541C185.692 39.619 187.526 38.2751 189.312 38.2751C190.229 38.2751 191.131 38.6229 191.779 39.3186V34.9866ZM189.755 44.5517C190.862 44.5517 191.779 43.5715 191.779 42.3541C191.779 41.1209 190.862 40.1407 189.755 40.1407C188.633 40.1407 187.716 41.1209 187.716 42.3541C187.716 43.5715 188.633 44.5517 189.755 44.5517Z" fill="currentColor"/>
+<path d="M184.539 42.3223V45.7847C184.539 46.1167 184.27 46.3855 183.938 46.3855C183.764 46.3855 183.59 46.2906 183.48 46.1483L182.673 45.1365C182.025 45.9586 181.045 46.3855 180.049 46.3855C178.262 46.3855 176.428 45.0416 176.428 42.3064C176.428 40.0614 178.246 38.259 180.491 38.259C182.721 38.259 184.539 40.0614 184.539 42.3223ZM182.515 42.3223V42.3064C182.515 41.0891 181.598 40.093 180.491 40.093C179.369 40.093 178.452 41.0891 178.452 42.3064C178.452 43.5238 179.369 44.5199 180.491 44.5199C181.598 44.5199 182.499 43.5396 182.515 42.3223Z" fill="currentColor"/>
+<path d="M173.409 39.3341C174.042 38.6385 174.927 38.2748 175.828 38.259V40.1404C174.374 40.1404 173.504 40.7254 173.504 42.0219V46.3222H171.481V38.8756C171.481 38.5436 171.765 38.259 172.097 38.259C172.271 38.259 172.429 38.3223 172.556 38.4488L173.409 39.3341Z" fill="currentColor"/>
+<path d="M164.077 40.4413H170.116V40.71C170.116 44.631 167.555 46.4649 164.947 46.4649C162.211 46.4649 159.429 44.4728 159.429 40.8049C159.429 37.1369 162.148 35.129 164.883 35.129C167.097 35.129 169.326 36.4413 170.116 39.2871H167.871C167.223 37.8168 165.974 37.1053 164.757 37.1053C163.128 37.1053 161.563 38.3859 161.563 40.8049C161.563 43.1922 163.366 44.4728 165.073 44.4728C166.338 44.4728 167.555 43.7772 167.95 42.291H164.077V40.4413Z" fill="currentColor"/>
+<path d="M152.694 38.3225H154.955L152.078 45.1683C150.718 48.5675 149.027 49.7375 146.339 49.7375V47.8561C148.03 47.8561 148.995 47.192 149.77 45.4055L146.529 38.3225H148.774L150.876 42.7336L152.694 38.3225Z" fill="currentColor"/>
+<path d="M140.212 39.3186C140.86 38.6229 141.761 38.2751 142.678 38.2751C144.465 38.2751 146.299 39.619 146.299 42.3541C146.299 44.5834 144.481 46.4015 142.252 46.4015C140.006 46.4015 138.188 44.5834 138.188 42.3541V34.9866H140.212V39.3186ZM142.252 44.5517C143.358 44.5517 144.275 43.5715 144.275 42.3541C144.275 41.1209 143.358 40.1407 142.252 40.1407C141.129 40.1407 140.228 41.1209 140.212 42.3383V42.3541C140.212 43.5715 141.129 44.5517 142.252 44.5517Z" fill="currentColor"/>
+<path d="M204.598 43.4687C204.231 44.1288 203.496 44.4797 202.752 44.4797C202.008 44.4797 200.847 43.9199 200.655 42.7502H206.637V42.5079C206.553 39.6003 204.573 38.2301 202.602 38.2301C200.63 38.2301 198.591 39.6421 198.591 42.299C198.591 44.9559 200.722 46.4013 202.802 46.4013C204.882 46.4013 205.802 45.6494 206.453 44.0786L204.598 43.4687ZM202.643 40.0599C203.379 40.0599 204.105 40.4609 204.423 41.2379H200.83C201.181 40.4609 201.908 40.0599 202.643 40.0599Z" fill="currentColor"/>
+<path d="M223.208 43.4687C222.841 44.1288 222.105 44.4797 221.362 44.4797C220.618 44.4797 219.457 43.9199 219.265 42.7502H225.247V42.5079C225.163 39.6003 223.183 38.2301 221.211 38.2301C219.24 38.2301 217.201 39.6421 217.201 42.299C217.201 44.9559 219.332 46.4013 221.412 46.4013C223.492 46.4013 224.411 45.6494 225.063 44.0786L223.208 43.4687ZM221.253 40.0599C221.988 40.0599 222.715 40.4609 223.033 41.2379H219.44C219.791 40.4609 220.518 40.0599 221.253 40.0599Z" fill="currentColor"/>
+<path d="M294.107 43.4687C293.74 44.1288 293.004 44.4797 292.261 44.4797C291.517 44.4797 290.356 43.9199 290.164 42.7502H296.146V42.5079C296.062 39.6003 294.082 38.2301 292.11 38.2301C290.138 38.2301 288.1 39.6421 288.1 42.299C288.1 44.9559 290.23 46.4013 292.311 46.4013C294.391 46.4013 295.31 45.6494 295.962 44.0786L294.107 43.4687ZM292.152 40.0599C292.887 40.0599 293.614 40.4609 293.932 41.2379H290.339C290.69 40.4609 291.417 40.0599 292.152 40.0599Z" fill="currentColor"/>
+<path d="M123.566 26.9293L123.524 28.629H106.56V0.31999H123.524V2.02134H108.621V13.4651H121.023V15.1258H108.621V26.9293L123.566 26.9293ZM153.73 26.8886V28.629H138.264V0.31999H140.325V26.8886H153.73ZM187.306 8.54335C186.655 6.76218 185.733 5.23842 184.545 3.97171C183.36 2.70501 181.937 1.72825 180.276 1.04127C178.615 0.35411 176.785 0.0105282 174.783 0.0105282C172.784 0.0105282 170.957 0.357383 169.303 1.05091C167.649 1.74443 166.229 2.72137 165.04 3.98153C163.852 5.2417 162.934 6.76218 162.279 8.54335C161.625 10.3229 161.299 12.3009 161.299 14.4744C161.299 16.6626 161.625 18.6456 162.279 20.4267C162.934 22.2063 163.852 23.7269 165.04 24.9869C166.229 26.2487 167.649 27.2224 169.303 27.9077C170.957 28.5965 172.784 28.9383 174.783 28.9383C176.785 28.9383 178.615 28.5965 180.276 27.9077C181.937 27.2224 183.36 26.2487 184.545 24.9869C185.733 23.7269 186.655 22.2063 187.306 20.4267C187.961 18.6456 188.286 16.6626 188.286 14.4744C188.286 12.3009 187.961 10.3229 187.306 8.54335ZM185.346 19.8065C184.799 21.3742 184.027 22.7044 183.024 23.7969C182.025 24.8909 180.826 25.7244 179.426 26.2976C178.023 26.8722 176.476 27.1589 174.783 27.1589C173.103 27.1589 171.563 26.8722 170.163 26.2976C168.762 25.7244 167.557 24.8909 166.551 23.7969C165.545 22.7044 164.764 21.3742 164.21 19.8065C163.657 18.2385 163.38 16.4625 163.38 14.4744C163.38 12.5013 163.657 10.7266 164.21 9.15234C164.764 7.5795 165.545 6.24608 166.551 5.15207C167.557 4.05806 168.762 3.2211 170.163 2.64156C171.563 2.06038 173.103 1.77061 174.783 1.77061C176.476 1.77061 178.023 2.06038 179.426 2.64156C180.826 3.2211 182.025 4.05806 183.024 5.15207C184.027 6.24608 184.799 7.5795 185.346 9.15234C185.893 10.7266 186.167 12.5013 186.167 14.4744C186.167 16.4625 185.893 18.2385 185.346 19.8065ZM221.087 23.8661C221.22 23.8661 221.334 23.9133 221.429 24.0061L222.226 24.8674C221.64 25.4942 221.002 26.0575 220.318 26.5573C219.631 27.0571 218.876 27.4853 218.055 27.8386C217.235 28.1919 216.336 28.4654 215.356 28.6575C214.376 28.8513 213.298 28.949 212.126 28.949C210.166 28.949 208.368 28.6054 206.734 27.9184C205.099 27.2313 203.696 26.2577 202.523 24.9976C201.348 23.7375 200.439 22.2136 199.791 20.426C199.143 18.6383 198.821 16.6521 198.821 14.4639C198.821 12.3165 199.153 10.3563 199.821 8.58168C200.488 6.8087 201.423 5.28482 202.621 4.01166C203.823 2.73688 205.262 1.75026 206.945 1.05019C208.625 0.350111 210.478 7.47343e-05 212.507 7.47343e-05C214.438 7.47343e-05 216.154 0.299641 217.645 0.900402C219.14 1.49953 220.501 2.34777 221.728 3.44021L221.106 4.34053C220.999 4.50171 220.833 4.58149 220.608 4.58149C220.449 4.58149 220.188 4.43496 219.827 4.14028C219.465 3.84723 218.967 3.52486 218.326 3.17157C217.687 2.81828 216.89 2.49429 215.936 2.20124C214.981 1.90655 213.839 1.76003 212.507 1.76003C210.797 1.76003 209.234 2.05471 207.815 2.64082C206.395 3.22692 205.174 4.06864 204.151 5.16109C203.132 6.25516 202.335 7.58855 201.761 9.16291C201.188 10.7356 200.902 12.5037 200.902 14.4639C200.902 16.4649 201.192 18.2525 201.771 19.8252C202.354 21.3996 203.149 22.7297 204.164 23.8173C205.177 24.9048 206.372 25.7368 207.753 26.318C209.133 26.8976 210.625 27.1874 212.227 27.1874C213.239 27.1874 214.141 27.1206 214.936 26.9871C215.727 26.8553 216.46 26.655 217.127 26.388C217.792 26.121 218.413 25.7937 218.987 25.4079C219.56 25.0204 220.126 24.5678 220.686 24.0468C220.755 23.9931 220.82 23.9508 220.888 23.9166C220.953 23.884 221.022 23.8661 221.087 23.8661ZM237.236 28.629H235.175V0.31999H237.236V28.629ZM272.491 2.06204H262.546V28.6291H260.485V2.06204H250.482V0.31999H272.491V2.06204ZM293.008 16.9655V28.6291H290.967V16.9655L280.485 0.31999H282.286C282.471 0.31999 282.624 0.36395 282.745 0.450237C282.865 0.538152 282.966 0.660259 283.044 0.821439L291.149 13.8249C291.322 14.131 291.481 14.4289 291.628 14.7155C291.774 15.002 291.901 15.2853 292.009 15.5653C292.116 15.2853 292.233 15.002 292.367 14.7155C292.5 14.4289 292.653 14.131 292.829 13.8249L300.931 0.821439C300.996 0.674913 301.093 0.554435 301.22 0.460005C301.347 0.367204 301.504 0.31999 301.692 0.31999H303.49L293.008 16.9655ZM94.4895 7.47343e-05L85.7388 28.949H83.9653L92.7156 7.47343e-05H94.4895ZM79.5261 10.6581L76.3043 0H74.5303L78.6393 13.5923L79.5261 10.6581Z" fill="currentColor"/>
+<path d="M59.8168 25.4638V27.7948C59.8168 28.4387 59.2949 28.9605 58.6512 28.9605H41.4192C40.7757 28.9605 40.2538 28.4387 40.2538 27.7948V1.16545C40.2538 0.521736 40.7757 0 41.4192 0H58.322C58.9659 0 59.4876 0.521736 59.4876 1.16545V3.49653C59.4876 4.14043 58.9659 4.66217 58.322 4.66217H44.9159V12.1492H55.7304C56.3741 12.1492 56.896 12.6709 56.896 13.3146V15.6457C56.896 16.2896 56.3741 16.8113 55.7304 16.8113H44.9159V24.2983H58.6512C59.2949 24.2983 59.8168 24.82 59.8168 25.4638ZM88.9126 0H86.1634C85.6496 0 85.1964 0.336491 85.0477 0.82823L78.6255 22.0779L72.203 0.82823C72.0545 0.336491 71.6013 0 71.0874 0H68.3382C67.7128 0 67.2647 0.603539 67.4456 1.20217L75.5847 28.1321C75.7332 28.624 76.1864 28.9605 76.7003 28.9605H80.5504C81.0644 28.9605 81.5176 28.624 81.6661 28.1321L89.8051 1.20217C89.9862 0.603539 89.5381 0 88.9126 0ZM1.6261 10.4069H0V12.0332H1.6261V10.4069ZM3.23548 16.7106H5.34933V14.5968H3.23548V16.7106ZM3.37328 6.18179H1.7639V7.79117H3.37328V6.18179ZM30.8882 3.94265C32.1392 5.22735 32.78 6.98634 32.6484 8.77478C32.5355 10.3589 31.8547 11.9323 30.6549 13.4826V16.5279C30.6549 23.3943 25.0887 28.9605 18.2224 28.9605H5.49003V27.0755H7.07724V25.3403H4.40257V22.6777H2.76356V20.4111H5.02993V21.7204H6.69021V18.1002H8.24414V14.4802H7.07724V10.8601H5.40423V7.24012H8.02254V3.61997H4.26696V1.34524H6.00759V0H18.2224C21.0955 0 23.7279 0.989479 25.8322 2.62685C27.5801 2.1462 29.5211 2.57395 30.8882 3.94265ZM12.9065 6.30427C17.3436 5.61292 20.63 7.28411 23.1965 8.58299C24.0484 9.01693 24.7613 9.36378 25.3916 9.59829C24.2538 6.72329 21.4975 4.66217 18.2224 4.66217H12.9065V6.30427ZM20.2088 24.0073C19.8283 22.8351 18.661 22.0588 17.393 22.2185C16.2741 22.3595 15.4035 23.2083 15.179 24.2983H18.2224C18.9141 24.2983 19.5718 24.1781 20.2088 24.0073ZM31.6929 8.70298C31.8109 7.18504 31.2737 5.68928 30.217 4.59327C28.592 2.96534 25.9695 2.91681 24.2856 4.48365L24.8642 5.06247C25.4121 4.65344 26.0778 4.43348 26.7616 4.43566C28.5187 4.43548 29.9434 5.85943 29.9436 7.61661C29.9438 8.46065 29.6086 9.27034 29.0116 9.86716C27.2238 11.6652 25.1624 10.6378 22.7753 9.40832C21.1075 8.56245 19.2206 7.60006 16.9226 7.21321C14.2617 6.78165 11.5734 7.23376 8.70352 8.58299C8.16288 8.8375 7.93074 9.48231 8.18542 10.0231C8.20051 10.0549 10.1826 13.476 10.1829 13.4768C10.4798 13.9865 11.13 14.1646 11.6452 13.8774C11.6454 13.8774 13.798 12.7096 15.1829 11.4494C15.3721 11.2773 15.665 11.2911 15.8369 11.4802C16.0091 11.6694 15.9953 11.9623 15.8062 12.1342C14.9342 12.911 13.0048 14.2268 13.0048 14.2268L12.9065 14.2812V24.2983H14.2148C14.5101 22.3892 16.2767 21.0592 18.1984 21.321C19.564 21.5071 20.674 22.4619 21.0908 23.7369C21.9485 23.3914 22.7282 22.8971 23.4015 22.2839C23.6911 20.28 24.4461 17.7144 26.4225 16.237C29.6931 13.7883 31.5148 11.1891 31.6929 8.70298ZM22.2548 11.22C21.7516 11.2218 21.3453 11.6312 21.3471 12.1342L22.8027 12.8638C23.0356 12.6911 23.1701 12.4173 23.1692 12.1275C23.1672 11.6245 22.7578 11.218 22.2548 11.22ZM0.68362 27.5238H2.56859V25.6388H0.68362V27.5238Z" fill="url(#paint0_linear_116_3469)"/>
+<defs>
+<linearGradient id="paint0_linear_116_3469" x1="41.7039" y1="29.7572" x2="45.8712" y2="-1.38835" gradientUnits="userSpaceOnUse">
+<stop stop-color="#209BC4"/>
+<stop offset="1" stop-color="#4DC9C0"/>
+</linearGradient>
+</defs>
+</svg>
+        <span class="sep">/</span><span class="mid">Build Caching Optimizer</span>
+        <span class="sep">/</span><span class="title">Top Savings Opportunities</span>
+      </div>
+      <div class="row-filter hidden" id="opFilter" role="group" aria-label="Rows to show"></div>
+    </div>
+  </header>
+
+  <div class="strip">
+    <div class="container">
+      <div class="vs-item"><span class="vs-label">Develocity URL</span><span class="vs-value strong" id="stripInstance"></span></div>
+      <div class="vs-sep"></div>
+      <div class="vs-item"><span class="vs-label">Window</span><span class="vs-value" id="stripWindow"></span><span class="vs-value dim" id="stripDays"></span></div>
+      <div class="vs-sep"></div>
+      <div class="vs-item"><span class="vs-label">Generated</span><span class="vs-value" id="stripGenerated"></span></div>
+    </div>
+  </div>
+
+  <main class="main">
+    <div class="container">
+
+      <div class="callout hidden" id="stateNote"></div>
+
+      <div class="metrics-grid" id="tiles"></div>
+
+      <div class="section" id="opportunitiesSection">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Savings opportunities</span>
+          </div>
+          <p class="fix-note hidden" id="opNote">Each opportunity comes with a paste-ready &ldquo;Fix&rdquo; prompt that runs the Build Caching Optimizer on that project.</p>
+          <div class="table-wrap" id="opportunitiesTable"></div>
+          <nav class="pager hidden" id="opPager" aria-label="Opportunity pages"></nav>
+          <div class="table-foot hidden" id="opFoot"></div>
+        </div>
+      </div>
+
+      <div class="section" id="coverageSection">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">What this run could and could not see</span>
+          </div>
+          <div class="cov" id="coverage"></div>
+        </div>
+      </div>
+
+      <footer class="report-footer hidden" id="reportFooter">Version <span class="rf-version" id="footerVersion"></span></footer>
+
+    </div>
+  </main>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+  <div id="tip" role="tooltip"></div>
+
+  <!-- Shared by every copy affordance — a fix prompt and a build invocation both land here — so the
+       wording stays generic. -->
+  <div id="modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Copy text">
+    <div class="modal">
+      <div class="modal-head"><b>Copy this text</b><button class="btn" id="modalClose">Close</button></div>
+      <p class="modal-hint">This view blocked automatic copy. The text is selected &mdash; press <kbd>&#8984;</kbd><kbd>C</kbd> (macOS) or <kbd>Ctrl</kbd><kbd>C</kbd>, then <kbd>Esc</kbd> to close.</p>
+      <p class="modal-hint hidden" id="modalWhere"></p>
+      <textarea id="modalText" readonly spellcheck="false"></textarea>
+    </div>
+  </div>
+
+<script>
+// ── read the data island ──
+const $ = s => document.querySelector(s);
+const str = v => v == null ? "" : String(v);
+const ESC_MAP = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" };
+const esc = s => str(s).replace(/[&<>"]/g, c => ESC_MAP[c]);
+const fmtInt = n => n == null ? "–" : String(n);
+const plural = (n, one, many) => n === 1 ? one : many;
+const hours = r => r.wasted_ci_hours != null ? Number(r.wasted_ci_hours) : 0;
+
+let payload = null;
+try { payload = JSON.parse(document.getElementById("report-data").textContent); } catch (e) { payload = null; }
+
+const meta = (payload && payload.meta) || null;
+const allRecords = (payload && Array.isArray(payload.records)) ? payload.records : [];
+const isActive = r => r && (r.state === "confirmed" || r.state === "candidate");
+const records = allRecords.filter(isActive);
+
+const derived = (payload && payload.derived) || null;
+const opportunities = (derived && Array.isArray(derived.opportunities)) ? derived.opportunities : [];
+const coverage = (derived && derived.coverage) || null;
+const instanceCoverage = (derived && derived.instance_coverage) || null;
+const windowDays = derived ? Number(derived.window_days) : null;
+const reachTotal = (derived && derived.reach_total) || "";
+// The remote Build Cache adoption rows and their figures, or null on a run that did not look for them —
+// including every payload filled before the option existed, which reads as include cache-miss-fixes.
+const savings = (derived && derived.remote_cache_adoption) || null;
+const rowKinds = savings ? savings.row_kinds : "cache-miss-fixes";
+const savingsRows = (savings && Array.isArray(savings.rows)) ? savings.rows : [];
+// Whether any project has a remote Build Cache adoption row. Where none does, a run that also looked for
+// cache misses draws no zero estimate beside its measured figures: "~0 h/wk potential" and "0 projects
+// run some CI builds with remote Build Cache disabled" are noise on the run where everything is set up.
+const hasAdoptionRows = savingsRows.length > 0;
+// The table's one order, both kinds of row, from opportunities.ranked_rows. A payload filled before
+// it existed carries cache-miss opportunities only, in their own order.
+const tableRows = (derived && Array.isArray(derived.rows))
+  ? derived.rows
+  : opportunities.map((_, index) => ({ kind: "cache_miss", index }));
+const rowRate = t => Number(t.kind === "remote_cache_adoption"
+  ? savingsRows[t.index].rate : opportunities[t.index].recoverable_hours_per_week);
+// The table's filter over the two kinds of row. Drawn only where the run holds both: with one kind,
+// every segment but one would show nothing.
+const ROW_FILTERS = [["all", "All"], ["remote_cache_adoption", "Remote Build Cache adoption"], ["cache_miss", "Avoidable cache misses"]];
+const filterable = rowKinds === "all" && savingsRows.length > 0 && opportunities.length > 0;
+let rowFilter = "all";
+const shownRows = () => rowFilter === "all" ? tableRows : tableRows.filter(t => t.kind === rowFilter);
+// What this run may call the things it measured, decided once in scripts/opportunities.py so the
+// summary and this page cannot drift apart on it. Naming both tools is the fallback that is never
+// wrong for a reader, and it is what a payload filled before this block carried gets rendered with.
+const UNIT_NOUNS = (derived && derived.unit_nouns)
+  || { singular: "Gradle task or Maven goal", plural: "Gradle tasks and Maven goals" };
+const capitalized = s => s.charAt(0).toUpperCase() + s.slice(1);
+
+const WHOLE_HOURS_THRESHOLD = 10;
+function roundHours(h) {
+  const n = Number(h);
+  if (!Number.isFinite(n)) return 0;
+  return n >= WHOLE_HOURS_THRESHOLD ? Math.round(n) : Math.round(n * 10) / 10;
+}
+const fmtFigure = v => Number.isInteger(v) ? String(v) : v.toFixed(1);
+const fmtHours = h => fmtFigure(roundHours(h));
+const totalHours = hs => Math.round(hs.reduce((s, h) => s + roundHours(h), 0) * 10) / 10;
+
+const toolLabel = t => t === "gradle" ? "Gradle" : t === "maven" ? "Maven" : str(t);
+function breakable(s) {
+  return esc(s).replace(/([:-])/g, "$1<wbr>");
+}
+function unitHtml(u) {
+  const s = str(u);
+  const at = s.indexOf(" @ ");
+  if (at > -1) return `${esc(s.slice(0, at))}<span class="mod"> @ ${esc(s.slice(at + 3))}</span>`;
+  return esc(s);
+}
+const unitCellHtml = u => `<span class="unit elide">${unitHtml(u)}</span>`;
+// The (project, work_unit) pairs more than one of the GIVEN records carries, each mapped to the half
+// of `groupId:artifactId` that actually tells that clash apart. Only a clashing pair is worth a
+// module at all: a Maven goal whose display name is already unique on the page gains nothing from its
+// coordinate, and every Gradle row and every row detected by display name carries no module.
+//
+// Usually the colliding modules share a group id, so the artifact id alone is the shorter, clearer
+// label. But the reverse happens — `org.apache.nifi:dockermaven` beside
+// `org.apache.nifi.registry:dockermaven`, two modules whose POMs set no name at all, so Develocity
+// falls back to the artifact id for both. There the artifact ids are identical and only the group id
+// separates them, so the whole coordinate has to show. Deciding per clash rather than once for the
+// page keeps the common case short without going blank on this one.
+const artifactOf = m => str(m).split(":").pop();
+function clashingUnits(records) {
+  const groups = new Map();
+  records.forEach(r => {
+    const k = JSON.stringify([r.project, r.work_unit]);
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(r.module);
+  });
+  const modes = new Map();
+  groups.forEach((modules, k) => {
+    if (modules.length < 2) return;
+    const artifacts = modules.map(artifactOf);
+    modes.set(k, new Set(artifacts).size === artifacts.length ? "artifact" : "full");
+  });
+  return modes;
+}
+const moduleLabel = (m, mode) => mode === "full" ? str(m) : artifactOf(m);
+const moduleLineHtml = (m, mode) =>
+  `<span class="modline" tabindex="0" data-tip="${esc(m)}">${esc(moduleLabel(m, mode))}</span>`;
+const normalizeWs = v => str(v).trim().split(/\s+/).join(" ");
+const invocationChipHtml = s =>
+  `<span class="inv inv-copy" role="button" tabindex="0" aria-label="Copy build invocation" data-tip="(click to copy the invocation)" data-inv="${esc(s)}">${breakable(s)}<span class="inv-more"> ⧉</span></span>`;
+function bindInvocationCopy(root) {
+  root.querySelectorAll(".inv-copy").forEach(el => {
+    const doCopy = () => copy(el.getAttribute("data-inv"), null, "Build invocation copied");
+    el.addEventListener("click", doCopy);
+    el.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); doCopy(); } });
+  });
+}
+const pctWidth = (v, max) => `${(v / max * 100).toFixed(1)}%`;
+// Two states, Recent and Dormant, and opportunities.last_diverged decides which — and names which,
+// in `state`. The cell held the two words as literals of its own, which is one wording per shared
+// concept stated twice rather than once: the summary's footnote already reads them off
+// opportunities.recency_state, so the cell reads the same producer through the payload. The cell printed
+// a banded distance instead — "at window end", "12d before end", with a dot in one of three colours.
+// Three bands put the burden of interpretation on the reader, and the middle one was neither a reason
+// to act nor a reason not to. The state is the whole cell now, and every figure behind it — the
+// calendar date, the window, the distance the state was decided from — is in the tooltip, composed
+// once in opportunities.recency_note.
+//
+// The second state reads "Dormant": inactive for now, and able to come back. It is not called
+// "Possibly Fixed", because this column measures silence and never a fix. What the state is worth
+// knowing for: the rate every surface quotes is the window's average, so a cause fixed inside the
+// window is still quoted at its pre-fix cost. The state cannot correct that number, and it lets a
+// reader discount it.
+//
+// Only "Recent" carries a dot; the dotless row keeps the dot's width, so both words start at the
+// same x. The state word is on every row either way, so no row loses a fact with its dot.
+//
+// "Seen" means seen as an opportunity, which is what the payload's `last_diverged` dates: a miss at a
+// source that produced more than one key. Not the unit's last miss of any kind — a unit whose runs rarely
+// repeat a commit misses daily on legitimate cold misses and would always read as current.
+function seenCellHtml(o) {
+  const seen = o.last_diverged;
+  const tip = str(seen && seen.note);
+  // Null days_ago means the run could not date this row against the window, which is not a quiet
+  // failure: the dash is the state, and the tooltip says why there is none.
+  if (!seen || seen.days_ago == null) {
+    return `<td class="seen"><span tabindex="0" data-tip="${esc(tip)}" aria-label="${esc(tip)}">—</span></td>`;
+  }
+  const dot = seen.stale ? `<span class="seen-nodot"></span>` : `<span class="rdot recent"></span>`;
+  // The word is the payload's, from opportunities.recency_state, so this cell and the summary's
+  // footnote cannot name one row's state two ways. Escaped like every other payload string: it
+  // arrives as data, whatever wrote the file.
+  // `aria-label` because the tooltip is the only place the figures live now. `bindTips` positions a
+  // shared node from `data-tip` and associates it with nothing, so a screen reader reaching this
+  // cell would hear the state word and lose the date, the window and the distance it was decided
+  // from — every figure this column stopped printing. The label leads with the state so the word a
+  // sighted reader sees is the word announced first, the way `metricInfo` leads with "Details".
+  return `<td class="seen"><span tabindex="0" data-tip="${esc(tip)}" aria-label="${esc(seen.state)}. ${esc(tip)}">${dot}<span class="seen-state">${esc(seen.state)}</span></span></td>`;
+}
+// An estimate carries a tilde and the estimate colour, so it never reads as a measured figure.
+const costCellHtml = (rate, max, estimate = false) => `<td class="num cost${estimate ? " estimate" : ""}"><div class="figline"><span class="fig">${estimate ? "~" : ""}${fmtHours(rate)}</span><span class="u">h/wk</span></div><div class="bar"><i style="width:${pctWidth(rate, max)}"></i></div></td>`;
+
+// ── scope strip ──
+$("#stripInstance").textContent = (meta && meta.instance) || "?";
+// UTC on both, as the Failure Report does: every window bound and every date this run reads is a
+// UTC date, so a report opened in another zone still names the days it actually surveyed.
+$("#stripWindow").textContent = `${(meta && meta.window_start) || "?"} → ${(meta && meta.window_end) || "?"} UTC`;
+$("#stripGenerated").textContent = meta && meta.generated ? `${meta.generated} UTC` : "?";
+if (meta) {
+  // Guarded, and this one is reachable: the strip is drawn at the top level, so it also runs for a
+  // payload carrying `meta` and no `derived` block, where windowDays is null and the pill would
+  // read "(nulld)". The rate card needs no such guard — `tilesHtml` runs only from `render()`,
+  // which that payload never reaches.
+  if (windowDays > 0) $("#stripDays").textContent = `(${windowDays}d)`;
+  document.title = "Build Caching Optimizer - Top Savings Opportunities";
+}
+
+// ── footer: the skill version that produced this report ──
+// Hidden unless the data file records a version.
+const skillVersion = meta && meta.skill_version;
+if (skillVersion) {
+  $("#footerVersion").textContent = skillVersion;
+  $("#reportFooter").classList.remove("hidden");
+}
+
+// ── empty and unfilled states ──
+function showStateNote(html, { keepTiles = false } = {}) {
+  $("#stateNote").innerHTML = html;
+  $("#stateNote").classList.remove("hidden");
+  if (!keepTiles) ["#tiles", "#opportunitiesSection"].forEach(s => $(s).classList.add("hidden"));
+}
+function showUnfilled(html) {
+  showStateNote(html);
+  $("#coverageSection").classList.add("hidden");
+}
+
+function render() {
+  // Every opportunity: this surface's headline totals the whole run, where the summary's totals
+  // only the top three it lists (references/report.md).
+  const rates = opportunities.map(o => Number(o.recoverable_hours_per_week));
+  const recoverable = totalHours(rates);
+  const projects = new Set(opportunities.map(o => allRecords[o.representative].project)).size;
+
+  // ── tiles ──
+  // The scope strip carries no headline pill: it repeated the tiles below it, and the tiles and the
+  // table follow the filter.
+  const renderTiles = () => {
+    $("#tiles").innerHTML = tilesHtml(recoverable, projects);
+    bindTips($("#tiles"));
+    fitBarCounts();
+  };
+  // A count wider than its segment is hidden there; the legend still states it.
+  const fitBarCounts = () =>
+    $("#tiles").querySelectorAll(".cov-bar span").forEach(seg => seg.classList.toggle("narrow", seg.scrollWidth > seg.clientWidth));
+  const renderFiltered = () => {
+    renderTiles();
+    renderOpportunities();
+  };
+  // The views differ in how many lines their cards hold, so the tiles row keeps the height of the
+  // tallest view and toggling never moves the table under it. Measured again on a resize, since the
+  // cards wrap differently at another width.
+  const reserveTilesHeight = () => {
+    const tiles = $("#tiles"), current = rowFilter;
+    tiles.style.minHeight = "";
+    let tallest = 0;
+    for (const [key] of ROW_FILTERS) {
+      rowFilter = key;
+      tiles.innerHTML = tilesHtml(recoverable, projects);
+      tallest = Math.max(tallest, tiles.offsetHeight);
+    }
+    rowFilter = current;
+    tiles.style.minHeight = `${tallest}px`;
+  };
+  let pending = 0;
+  window.addEventListener("resize", () => {
+    cancelAnimationFrame(pending);
+    pending = requestAnimationFrame(() => filterable ? (reserveTilesHeight(), renderTiles()) : fitBarCounts());
+  });
+  if (filterable) {
+    reserveTilesHeight();
+    $("#opFilter").innerHTML = ROW_FILTERS.map(([key, label]) =>
+      `<button type="button" data-filter="${key}" aria-pressed="${key === rowFilter}">${esc(label)}</button>`).join("");
+    $("#opFilter").classList.remove("hidden");
+    $("#opFilter").addEventListener("click", e => {
+      const btn = e.target.closest("button[data-filter]");
+      if (!btn || btn.getAttribute("data-filter") === rowFilter) return;
+      rowFilter = btn.getAttribute("data-filter");
+      $("#opFilter").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b === btn)));
+      renderFiltered();
+    });
+  }
+  renderFiltered();
+  renderCoverage();
+}
+
+// Four cards, each carrying its own detail line under its value and its own tooltip beside its
+// label. On the rate card those two halves are divided: the sub-line owns the window arithmetic and
+// the tooltip owns the meaning. The count tile was to go, on the reasoning that the same number
+// stood three times on the Failure Report's page; this one keeps it, because what reads as noise
+// there is content here — its reach and project detail are facts no other surface on this page
+// states. What is shared is the affordance: one info icon per label, in place of the Coverage
+// card's bespoke "See details" link.
+//
+// A card's tooltip never restates its sub-line. That is the defect this file had when the sub-lines
+// were folded into the tooltips wholesale: the Coverage hover then said "9 of 14 projects fully
+// analyzed · 2 partially · 3 not at all" and, one sentence later, "3 projects not analyzable · 2
+// projects partially analyzable". The sub-line carries the reading; the tooltip carries what the
+// sub-line has no room for.
+function tilesHtml(recoverable, projects) {
+  // The reach clause counts what the listed fixes repair, so with nothing listed it has nothing to
+  // count — and its tool-less zero falls back to the noun "candidates" ("0 candidates"), which the
+  // Candidates-detected tile beside it uses for a number in the thousands. The project count goes
+  // with it: guarding only the reach left the card reading "0 projects" on its own, a detail line
+  // whose whole content was a zero. A card with no detail draws none.
+  const reachSub = opportunities.length
+    ? [reachTotal, `${projects} ${plural(projects, "project", "projects")}`]
+        .filter(Boolean).map(esc).join(" · ")
+    : "";
+  // How the confirmed misses became these rows. The sub-line counts the fixes' reach, so the hover
+  // carries the other direction — but never the row count itself: `opportunity_groups` and
+  // `derived.opportunities` are both `ranked_opportunities` over the same records, so `groups` IS
+  // the value this hover hangs off. It said "4 confirmed misses became 4 opportunities", which
+  // restates that figure and asserts a bundling step that did not happen on a run where nothing
+  // bundled. `groups < units` is what tells the two apart, whatever joined a star to its hub.
+  const units = coverage.opportunities, groups = coverage.opportunity_groups;
+  const opTip = units
+    ? (groups < units
+        ? `${fmtInt(units)} confirmed ${plural(units, "miss", "misses")} bundled into these rows, because one fix can repair several. `
+        : "Each row is one confirmed avoidable miss. ")
+      + "The account below has the whole funnel, from what was detected to what reached this table."
+    // Opens on the consequence, not on the value: the card already reads 0, so "No avoidable miss
+    // was confirmed in this window" was that figure in words. What a reader needs from the hover is
+    // that a zero here is not a clean bill of health.
+    : rowKinds === "all"
+      ? "No avoidable cache miss was confirmed, which is not a clean bill of health. The account below says what this run could and could not see."
+      : "A zero here is not a clean bill of health. The account below says what this run could and could not see.";
+  // Remote Build Cache adoption rows are counted by row and their projects by the query, which counts every
+  // project with a row — the ones beyond the table included, and a project with a Gradle and a Maven
+  // row once — so the sub-line states the count the tile beside it totals.
+  const SAVINGS_TIP = "Remote Build Cache adoption rows estimate what the remote Build Cache would save the projects whose CI builds run with it disabled. The table lists the largest of them; the count includes the rest, and the sub-line counts every project with one.";
+  // Beside the adoption sentence, "these rows" and "each row" would read as covering both kinds.
+  const missTip = opTip.replace("bundled into these rows", "bundled into the avoidable cache miss rows")
+    .replace("Each row is one confirmed avoidable miss.", "Each avoidable cache miss row is one confirmed miss.");
+  const spProjects = savings ? Number(savings.projects) || 0 : 0;
+  // Short enough to sit on one or two lines: the tooltip and the coverage account carry the rest.
+  // The cache-miss count is of fixes, the table's rows, not of the confirmed misses behind them.
+  // "run some CI builds with" rather than "with": it counts every project with a row, one that uses the
+  // remote Build Cache on some CI builds too, where the Coverage tile counts the projects that never do.
+  const spClause = `${spProjects} ${plural(spProjects, "project runs", "projects run")} some CI builds with remote Build Cache disabled`;
+  const missClause = `${opportunities.length} ${plural(opportunities.length, "fix", "fixes")} for avoidable cache misses`;
+  // The kinds of row the tiles describe: the run's own, narrowed by the filter, so every tile under it
+  // follows it. A cache-miss view draws the count tile exactly as a run without the remote Build Cache adoption rows did.
+  const view = rowKinds === "cache-miss-fixes" || (rowKinds === "all" && !hasAdoptionRows) ? "cache_miss"
+    : rowKinds === "remote-cache-adoption" ? "remote_cache_adoption" : rowFilter;
+  const opSub = view === "cache_miss" ? reachSub
+    : view === "remote_cache_adoption" ? esc(spClause)
+    : [spClause, missClause].map(esc).join(" · ");
+  const countTip = view === "remote_cache_adoption" ? SAVINGS_TIP
+    : view === "all" ? `${SAVINGS_TIP} ${missTip}` : opTip;
+  const detected = coverage.detected;
+  const inspected = coverage.inspected;
+  // The split under the value. Both terms stay even at the edges, so the card's detail reads the
+  // same way on every run (the sub-line is the reading; the tooltip carries the mechanics).
+  const detectedSub = [`${fmtInt(inspected)} inspected`]
+    .concat(coverage.not_inspected ? [`${fmtInt(coverage.not_inspected)} not inspected`] : [])
+    .join(" · ");
+  // What a candidate IS, in the words the query uses. It said "flagged as diverging at one commit",
+  // which is only detection's same-commit path: `queries/divergence.sql` also flags a unit whose
+  // divergence recurs across enough commits to matter, and that row prints a high Commits count in
+  // its own detail grid — so the card defined the noun as the opposite of what the row beside it
+  // shows. The second sentence follows what there is to say: a run that inspected nothing has no
+  // per-inspection outcome for the account to carry.
+  const detectedTip = "A candidate is a work unit detection flagged, at one commit or across many."
+    + (coverage.inspected
+        ? " The account below says what each inspection found."
+        : " The account below says what this run could and could not see.");
+  const detectedTile = detected == null
+    ? { value: `<div class="metric-value sm">not recorded</div>${subLine(`${coverage.inspected_units} inspected`)}`,
+        // The value already reads "not recorded", so the hover opens past it, on what that costs
+        // the reader rather than on the state itself.
+        tip: "What this run inspected cannot be read as a share of the whole, because it did not record how many candidates it detected." }
+    : { value: `<div class="metric-value">${fmtInt(detected)}</div>${subLine(detectedSub)}`,
+        tip: detectedTip };
+  // Coverage reads as a verdict, not a numeric breakdown: what a reader needs first is whether the
+  // run could see the whole server. Which verdict is opportunities.coverage_verdict's, computed into
+  // the payload, so nothing here re-derives it — this tile and the coverage account below read one
+  // verdict. A proportion bar is drawn only beside ✓ Complete (coverageBar below): beside any other
+  // verdict a nearly-full track reads as the opposite of the words next to it. The named projects
+  // and the remedies live in the coverage card below.
+  const cv = (derived && derived.coverage_verdict) || { state: "unmeasured" };
+  // The tools label appears only on the unmeasured state, where the run's records are the only
+  // evidence of what was seen. cv.tools describes the analyzed subset — records only exist for
+  // projects analyzable enough to yield candidates — so beside the measured, instance-wide counts it
+  // would claim a Gradle-only survey of a server whose unanalyzable projects are exactly the Maven
+  // ones. Off the verdict's own sanitized list rather than the raw records either way.
+  const covTools = (cv.tools || []).map(toolLabel).join(" + ");
+  // Each gap is a self-contained phrase, the way the Failure Report words its coverage reasons: a
+  // bare "1 partially" names neither the thing counted nor what it is partial at. These describe
+  // SCOPE and never a shortfall — a project whose builds turn off the remote Build Cache is
+  // invisible to this analysis by its own definition, so the run saw everything there was to see.
+  // The verdict above them stays ✓ Complete.
+  const covScope = cv.scope;
+  // Whether there is a gap for the tooltip to explain. The tooltip does not count that gap itself —
+  // "3 projects not analyzable · 2 projects partially analyzable" under a sub-line reading "2
+  // partially · 3 not at all" would be the same two numbers twice. The sub-line reads the partition;
+  // the tooltip explains it.
+  const covGap = !!(covScope && (covScope.skipped || covScope.partial));
+  // The project partition, under the verdict. These are the project details this card is the place
+  // for, and they are why the tooltip below states a cause rather than these counts again.
+  // Where the run looked for remote Build Cache adoption rows, the projects not analyzed at all are split by why:
+  // the ones without the remote Build Cache, which the adoption line counts, and the rest.
+  const adoption = (savings && savings.adoption) || null;
+  // On every tab: the cache-miss line counts over the projects with the remote Build Cache, so the line
+  // stating how many have it stays above it whatever the filter shows.
+  const showAdoption = !!adoption;
+  const covParts = [];
+  if (covScope) {
+    // Under the adoption line, which has already set aside the projects without the remote Build Cache, the
+    // analysis counts over the ones that have it: those are the projects it could ever read.
+    const withRemote = showAdoption ? adoption.total - adoption.without : null;
+    covParts.push(withRemote != null
+      ? `${fmtInt(covScope.analyzed)} of ${fmtInt(withRemote)} ${plural(withRemote, "project", "projects")} with the remote Build Cache fully analyzed`
+      : `${fmtInt(covScope.analyzed)} of ${fmtInt(covScope.total)} projects fully analyzed`);
+    if (covScope.partial) covParts.push(`${fmtInt(covScope.partial)} partially`);
+    if (covScope.skipped && !adoption) covParts.push(`${fmtInt(covScope.skipped)} not at all`);
+    if (adoption && adoption.neither) covParts.push(`${fmtInt(adoption.neither)} not analyzable`);
+  }
+  // The unmeasured sub-line names the build tools, and says what they are a list of. It read
+  // "Gradle · server coverage was not measured" under a value already reading "not measured", and
+  // trimming that clause left a bare tool list with nothing saying what it counted — and an empty
+  // string where the run has no record to name a tool at all. The tools are the one thing this
+  // state knows that the value does not (references/report.md), so they keep a noun and the card
+  // draws no sub-line where there is none.
+  const covSub = cv.state === "unmeasured"
+    ? (covTools ? `${covTools} in this run's own records` : "")
+    : cv.state === "empty"
+      ? (cv.has_projects
+          ? (cv.total === 1 ? "the only project that ran CI builds could not be analyzed"
+                            : `none of the ${fmtInt(cv.total)} projects that ran CI builds could be analyzed`)
+          : "no project ran CI builds in this window")
+      : cv.state !== "complete"
+        ? "this run reached no verdict on what it could see"
+        : covParts.length ? covParts.join(" · ")
+                          : "every project that ran CI builds was fully analyzable";
+  const covValue = cv.state === "unmeasured"
+    ? `<div class="metric-value sm">not measured</div>`
+    // The check is earned by the `complete` state and by nothing else; keying it off the scope
+    // counts instead printed a green check over any state this template does not know about.
+    : cv.state === "complete"
+      ? `<div class="metric-value sm ok">✓ Complete</div>`
+      : `<div class="metric-value sm">Not judged</div>`;
+  // Tooltip text. The scope state is built from the same counts the tile shows, so it names
+  // every gap the reader can see above it, not just the first. It also appends an example
+  // cause, which the tile does not carry — named from the remedies this run actually measured rather
+  // than a fixed "remote Build Cache", so it agrees with the account the link opens: a shortfall
+  // that is all missing commit ids must not point at a cache fix the run does not need, the same
+  // tooltip-vs-account gap the link otherwise closes. Only the two analyzability preconditions belong
+  // here (coverage.sql); a zero-count remedy names a skipped project's cause, and with neither present
+  // the run is partial-only — its cause is one of the two on some of a project's builds, so both are
+  // named. Input-file capture is a cause-confirmation remedy, not a reason a project fell short here.
+  // The unmeasured state carries its own reason rather than restating the tile's "not measured".
+  const covCauseWords = { projects_without_remote_cache: "the remote Build Cache is disabled on some builds",
+                          projects_without_commit_id: "no commit id is recorded on some builds" };
+  const covCausesMeasured = new Set((derived.remedies || []).filter(r => r.projects).map(r => r.key));
+  const covCauseKeys = Object.keys(covCauseWords).filter(k => covCausesMeasured.has(k));
+  const covCauses = (covCauseKeys.length ? covCauseKeys : Object.keys(covCauseWords)).map(k => covCauseWords[k]);
+  // The tooltip carries what the sub-line above it does not: the example cause, and the reassurance
+  // that a shortfall here is configuration rather than a fault of the run. It never restates the
+  // partition — the sub-line is where a reader reads that, and one hover carrying both said "9 of 14
+  // projects fully analyzed · 2 partially · 3 not at all" and then "3 projects not analyzable · 2
+  // projects partially analyzable", which is the same two numbers twice.
+  //
+  // Every state's tooltip states a CONSEQUENCE, never the state the sub-line already reads. Four of
+  // these five said the sub-line back in slightly different words — "none of the 14 projects that
+  // ran CI builds could be analyzed" under a hover reading "None of the 14 projects that ran CI
+  // builds could be analyzed, so there was no coverage to judge." What a reader needs from the
+  // hover is what the verdict means for the findings in front of them.
+  //
+  // The fifth said it too, in a shorter clause: "Nothing was analyzed" is the sub-line in two fewer
+  // words, and "There was nothing to analyze" is the other branch's. Each branch carries only what
+  // follows from the verdict now.
+  const covTip = cv.state === "unmeasured"
+    ? "Projects this run could not analyze can still hold avoidable misses that would not appear here."
+    : cv.state === "empty"
+      ? (cv.has_projects
+          ? `Avoidable misses in ${cv.total === 1 ? "that project" : "those projects"} cannot appear here.`
+          : "This report carries no findings for this window.")
+      // Guarded on there being a gap to explain: the gapless sentence below is `complete`'s, and a
+      // cause named over no gap would explain something the card does not show.
+      : covGap
+        ? `The projects this run could not fully analyze are not set up for this analysis — for example because ${covCauses.join(" or ")}. Nothing went wrong with this run, and they can still hold avoidable misses that would not appear here.`
+        // The gapless sentence belongs to `complete` alone; any other state reaching it would be
+        // told nothing is missing under a tile saying no verdict was reached.
+        : cv.state === "complete"
+          ? "Nothing is missing from this report because a project could not be read."
+          : "Read these findings as a floor: projects this run could not analyze can still hold avoidable misses that would not appear here.";
+  // Every card takes the info icon, so a reader learns the affordance once, and it is unconditional:
+  // the coverage card's old "See details" link appeared only where there was a gap, and the gapless
+  // state's own sentence is worth reading too.
+  //
+  // A run that includes only remote Build Cache adoption rows detects no cache miss, so the cards about the
+  // cache-miss analysis are not drawn rather than drawn at zero.
+  const only = rowKinds === "remote-cache-adoption";
+  // One verdict over both lines: the remote Build Cache adoption query reads every CI build, so remote Build Cache
+  // adoption is seen whole wherever the projects were counted, and the verdict is the cache-miss
+  // analysis's. Adoption across every project comes first, then what the cache-miss analysis could
+  // read; the filter picks the lines, and a run that skipped the analysis shows the adoption line alone.
+  const showVerdict = !only && rowFilter !== "remote_cache_adoption";
+  const adoptionLine = showAdoption
+    ? subLine(`${fmtInt(adoption.total)} ${plural(adoption.total, "project", "projects")} · ${fmtInt(adoption.without)} ${
+        plural(adoption.without, "never uses", "never use")} the remote Build Cache on CI`)
+    : "";
+  const coverageValue = showVerdict ? covValue
+    : adoption && adoption.total ? `<div class="metric-value sm ok">✓ Complete</div>` : `<div class="metric-value sm">Not judged</div>`;
+  const verdictLine = showVerdict ? subLine(covSub) : "";
+  // Where adoption was counted, the projects are one stacked bar instead of those two lines. Under the
+  // verdict's views it splits the projects by how far the cache-miss analysis read them, the ones with
+  // the remote Build Cache disabled on CI among the unread; the adoption view splits them by whether
+  // they use the remote Build Cache. Drawn only beside ✓ Complete: beside any other verdict a nearly
+  // full track would read as the opposite of the words next to it, so those keep their sub-line.
+  const covSegments = !adoption || !adoption.total ? null
+    : !showVerdict
+      ? [["uses", adoption.total - adoption.without, "use the remote Build Cache on CI"],
+         ["disabled", adoption.without, "never use it on CI"]]
+      : covScope && cv.state === "complete"
+        ? [["full", covScope.analyzed, "fully analyzed"],
+           ["partial", covScope.partial, "partially analyzed"],
+           ["disabled", adoption.without, "remote Build Cache disabled on CI"],
+           ["other", adoption.neither, "not analyzable"]]
+        : null;
+  // The total stands on its own line above the bar, as the line every segment is a share of.
+  const coverageBar = covSegments
+    ? subLine(`${fmtInt(adoption.total)} ${plural(adoption.total, "project", "projects")} ran CI builds`) +
+      `<div class="cov-bar" role="img" aria-label="${esc([`${fmtInt(adoption.total)} projects`, ...covSegments.filter(([, n]) => n).map(([, n, label]) => `${fmtInt(n)} ${label}`)].join(", "))}">${
+        covSegments.filter(([, n]) => n).map(([key, n, label]) => `<span class="cov-${key}" style="flex-grow:${n}" title="${esc(`${fmtInt(n)} ${label}`)}">${fmtInt(n)}</span>`).join("")}</div>` +
+      `<div class="cov-legend">${
+        covSegments.filter(([, n]) => n).map(([key, n, label]) => `<span><i class="cov-${key}"></i>${esc(label)} ${fmtInt(n)}</span>`).join("")}</div>`
+    : "";
+  const ADOPTION_TIP = "How many projects ran CI builds in this window, and how many of them never use the remote Build Cache on CI.";
+  const coverageTip = [showAdoption ? ADOPTION_TIP : "", showVerdict ? covTip : ""].filter(Boolean).join(" ");
+  // The adoption estimate is in the same unit as the measured time, so it is a second line of that
+  // card rather than a card of its own: marked as an estimate, and never added to the measured figure.
+  // The filter picks the lines, as it picks the rows.
+  const showMeasured = !only && rowFilter !== "remote_cache_adoption";
+  // A run that skipped cache-miss detection keeps its ~0: the estimate is all that run measures.
+  const showEstimate = !!savings && rowFilter !== "cache_miss" && (hasAdoptionRows || only);
+  const measuredLine = !showMeasured ? "" : `<div class="metric-value warn">${fmtFigure(recoverable)} <small>h / week</small></div>${subLine(str(derived.rate_window_note))}`;
+  const estimateLine = showEstimate
+    ? `<div class="metric-value estimate">~${fmtFigure(savings.total_per_week)} <small>h / week</small></div>${subLine(str(savings.tile_line))}`
+    : "";
+  const rateTip = [showEstimate ? str(savings.tile_note) : "", showMeasured ? str(derived.rate_note) : ""].filter(Boolean).join(" ");
+  // The rows beyond the table are counted too, as the note under the table says they are in the tiles:
+  // counting only the listed ones put 8 above a table reading "the 6 largest of 9" plus 2 cache misses.
+  const restRows = hasAdoptionRows && rowFilter !== "cache_miss" ? Number(meta.remote_cache_adoption_rest_rows || 0) : 0;
+  return [
+    `<div class="metric-card">${metricLabel("Savings opportunities", countTip)}<div class="metric-value gradient">${shownRows().length + restRows}</div>${subLine(opSub, { escaped: true })}</div>`,
+    // The estimate first, as remote Build Cache adoption comes before the cache misses wherever the two are ordered.
+    `<div class="metric-card">${metricLabel("Recoverable CI time", rateTip)}${estimateLine}${
+      measuredLine && estimateLine ? `<div class="metric-estimate">${measuredLine}</div>` : measuredLine}</div>`,
+    view === "remote_cache_adoption" ? "" : `<div class="metric-card">${metricLabel("Candidates detected", detectedTile.tip)}${detectedTile.value}</div>`,
+    // Its verdict judges how much of the instance the cache-miss analysis could read, which a run that
+    // skipped that analysis never attempts, so there the tile holds the adoption line alone.
+    adoptionLine || showVerdict
+      ? `<div class="metric-card">${metricLabel("Coverage", coverageTip)}${coverageValue}${coverageBar || adoptionLine + verdictLine}</div>`
+      : "",
+  ].join("");
+}
+
+// ── savings opportunities ──
+// One list, so the expanded row's colspan is its length rather than a number kept by hand beside it:
+// nothing in the suite can run this file, so a hand-kept count that goes stale when a column is
+// added shows on every printed row while CI stays green. The Recency column adds a 10px dot, its
+// 7px margin and a state word inside 24px of cell padding, so the table's min-width rises from
+// 680 to 810 rather than buying the new column out of Project and the work-unit name. The column
+// was narrower still once the banded day count became a word, and the floor stays where it is: a
+// min-width is a floor, and lowering it buys nothing a reader sees.
+// The headers for the kinds of row shown, since the Fix header describes what is under it.
+const COLUMNS = kinds => [
+  '<th class="num">#</th>', '<th>Project</th>', `<th>${capitalized(UNIT_NOUNS.singular)}</th>`, '<th>Problem</th>',
+  // One heading over both kinds, as the Recoverable CI time tile holds both: the ~, the colour and the
+  // legend under the table are what mark a figure as an estimate.
+  '<th class="num">Recoverable</th>',
+  '<th>Recency</th>',
+  // Remote Build Cache adoption rows have no prompt to paste, so over them alone the header states no mechanics for one.
+  `<th class="fix" abbr="Fix">Fix${kinds.has("cache_miss") ? `<span class="fix-how">Paste the prompt into an AI agent opened in the project's checkout</span>` : ""}</th>`,
+];
+const COLUMN_COUNT = COLUMNS(new Set()).length;
+function renderOpportunities() {
+  const shown = shownRows();
+  const kinds = new Set(shown.map(t => t.kind));
+  if (!tableRows.length) {
+    // Bare beside a visible state note: the note already states the absence and the pointer, and
+    // repeating either one card lower is the duplication the Failure Report's showEmpty hides its standing
+    // note to avoid. Full where the note is hidden — records exist but nothing was confirmed
+    // volatile or non-relocatable — since the card is then the only thing on screen saying it.
+    const noteVisible = !$("#stateNote").classList.contains("hidden");
+    // A run that includes only remote Build Cache adoption rows looked for no cache miss, so its empty table says what it did look for.
+    $("#opportunitiesTable").innerHTML = noteVisible
+      ? `<span class="card-empty">No savings opportunities to list.</span>`
+      : rowKinds === "remote-cache-adoption"
+        ? `<span class="card-empty">No remote Build Cache adoption rows: no project's CI builds with the remote Build Cache disabled reach ${esc(str(savings && savings.floor_hours))} CI hours over this window. The coverage card below says what this run could and could not see.</span>`
+        : `<span class="card-empty">No savings opportunities: this run confirmed nothing volatile or non-relocatable. The coverage card below says what this run could and could not see.</span>`;
+    return;
+  }
+  // Only over a table with a prompt in it: the note explains the Fix prompt, and a remote Build Cache
+  // adoption row's docs link explains itself. Where both kinds are shown, "each opportunity" would
+  // claim a prompt for the adoption rows too, so the note names the cache misses, and does so in every
+  // view of a run with the filter, so its height never changes with the view.
+  $("#opNote").textContent = filterable || kinds.has("remote_cache_adoption")
+    ? "Each avoidable cache miss comes with a paste-ready \u201cFix\u201d prompt that runs the Build Caching Optimizer on that project."
+    : "Each opportunity comes with a paste-ready \u201cFix\u201d prompt that runs the Build Caching Optimizer on that project.";
+  // A run with the filter keeps the note's place on the adoption view, so the table does not move
+  // when the filter switches.
+  $("#opNote").classList.toggle("hidden", !kinds.has("cache_miss") && !filterable);
+  $("#opNote").style.visibility = kinds.has("cache_miss") ? "" : "hidden";
+  // Over the shown rows: a filtered table compares its own rows, and its largest fills the bar.
+  const gmax = rowRate(shown[0]) || 1;
+  // Over everything this table renders — every row AND every sibling its tooltips name — rather than
+  // every record: a confirmed row must not carry a module line because its display name collides with
+  // an uninspected candidate the reader never sees. A bundled sibling is not that: it is displayed two
+  // lines below the row that names it.
+  //
+  // One map, not two. Rows and members were once mapped separately, and a colliding pair that landed
+  // in the same bundle then put one record in each map, so neither saw two under the key: the row
+  // printed no module line and the tooltip printed the member's bare display name, which is
+  // character-for-character the row's own. Two modules sharing a POM name and one cause — a shared
+  // non-reproducible jar, say — bundle exactly that way.
+  const membersOf = o =>
+    (o.members || []).filter(m => m !== o.representative).map(m => allRecords[m]);
+  // A named reach member is rendered too — the tooltip lists it — so it belongs in the clash set on
+  // the same reasoning that admitted bundled members. Leaving it out left a row bare while its own
+  // tooltip showed a namesake carrying a coordinate, which is the ambiguity stated and then not
+  // resolved. build_payload.py decorates such a name as `path (groupId:artifactId)` and only where
+  // the path repeats in its project, so a decorated entry both marks the clash and carries the
+  // module that proves it; an undecorated one names no second module and is nothing to map.
+  const namedRecords = records => records.flatMap(m =>
+    (Array.isArray(m.member_units_named) ? m.member_units_named : [])
+      .filter(n => n.endsWith(")") && n.lastIndexOf(" (") > 0)
+      .map(n => ({
+        project: m.project,
+        work_unit: n.slice(0, n.lastIndexOf(" (")),
+        module: n.slice(n.lastIndexOf(" (") + 2, -1),
+      })));
+  const clashInput = [
+    ...opportunities.map(o => allRecords[o.representative]),
+    ...opportunities.flatMap(membersOf),
+  ];
+  // Deduplicated across the WHOLE list, inferred members included. Two systemic records of one type
+  // name the same siblings, so filtering the inferred half against the initial half alone let a unit
+  // in twice; clashingUnits then saw a repeated artifactId, judged the artifact halves
+  // indistinguishable, and switched a clash to the full coordinate that did not need it. Two
+  // records under one (project, work_unit, module) are the same unit — a real clash differs in the
+  // module — so collapsing on that triple cannot hide one.
+  const seenUnits = new Set();
+  const firstSeen = m => {
+    const k = JSON.stringify([m.project, m.work_unit, m.module]);
+    if (seenUnits.has(k)) return false;
+    seenUnits.add(k);
+    return true;
+  };
+  const clashes = clashingUnits(
+    [...clashInput, ...namedRecords(clashInput)].filter(firstSeen));
+  const rows = shown.map((t, pos) => {
+    if (t.kind === "remote_cache_adoption") return savingsRowHtml(savingsRows[t.index], pos, gmax);
+    const o = opportunities[t.index], i = t.index;
+    const r = allRecords[o.representative];
+    const rowKey = JSON.stringify([r.project, r.work_unit]);
+    const memberRecords = membersOf(o);
+    const siblings = memberRecords.map(m => {
+      const k = JSON.stringify([m.project, m.work_unit]);
+      return m.module && clashes.has(k)
+        ? `${m.work_unit} (${moduleLabel(m.module, clashes.get(k))})`
+        : m.work_unit;
+    });
+    // Bulleted and blank-line separated: the tip is plain text in one element, so a bullet is the
+    // only thing that marks where an entry starts once a long goal path wraps, and a blank line is
+    // the only spacing available. Without both, seven siblings read as one unbroken block.
+    //
+    // Three cases, and the wording separates what was proven from what is inferred. Bundled members
+    // are each their own confirmed record merged in by a shared cause, so one fix "also repairs"
+    // them, and are listed as such. A type group is covered by inference from its type, so it gets
+    // its own heading and the weaker verb: "should also repair". Mixing the two under one heading
+    // would present an inference as a confirmation, which is the one thing this tooltip must not do.
+    //
+    // The verb carries that, and the heading does not say the members were not compared. It cannot:
+    // a saturated type has a second member compared before the type is settled
+    // (`references/classification.md`), and that member is named here like any other, so the blanket
+    // claim would be false for exactly the types the extra comparison exists to protect.
+    //
+    // A reach can cover dozens of units, so cap what is rendered rather than what the record carries;
+    // without it a wide type group reproduces the unreadable block the list replaced. The shortfall is
+    // counted against what the chip CLAIMS, not against the list, because the two can differ: the
+    // detection file is a cost-ordered slice, so a reach of twelve may arrive with two of its eleven
+    // members on hand. Naming those two and saying "and 9 more" is honest; naming them under a bare
+    // "12" would not be, and showing nothing would throw away what we do know.
+    const REACH_TIP_CAP = 10;
+    const bullets = (entries, cap) => entries.slice(0, cap).map(s => `• ${s}`);
+    // Dedup against the members' own identity, never the labels rendered above: a unit can reach
+    // both lists — a bundled member is also a member of its own type group — and the two surfaces
+    // label a clash differently. build_payload.py appends the whole coordinate, this page appends
+    // whichever half tells the clash apart, so comparing rendered strings never matched and listed
+    // a confirmed unit a second time as one that "was not compared".
+    //
+    // Both forms build_payload.py can write, and neither by prefix. Three modules sharing a POM
+    // name make the display name common property: matching `name (` would strike every one of them
+    // off for the single sibling that is bundled here, hiding two units whose coordinates are known
+    // inside "…and 2 more". The coordinate it appends is this record's own `module`, so the match
+    // is an equality on the whole string.
+    //
+    // Read from every record in the bundle, not the representative alone. The representative is
+    // whichever record roots the chain, or failing that the costliest — neither test looks at reach,
+    // so a plain record or a cheap chain root routinely speaks for a bundle whose named reach belongs
+    // to another member. `reach_units` already counts that member's reach, so reading only the
+    // representative would state the number and throw the names away. Sorted, because a union of two
+    // members' lists is no longer in the order either arrived in.
+    const bundleRecords = [r, ...memberRecords];
+    const siblingKeys = bundleRecords.flatMap(m =>
+      m.module ? [m.work_unit, `${m.work_unit} (${m.module})`] : [m.work_unit]);
+    const named = [...new Set(bundleRecords.flatMap(m =>
+      Array.isArray(m.member_units_named) ? m.member_units_named : []))]
+      .filter(n => !siblingKeys.includes(n)).sort();
+    const reachClaim = Math.max((Number(o.reach_units) || 1) - 1, 0);
+    const listed = siblings.length + named.length;
+    const unnamed = Math.max(reachClaim - Math.min(listed, REACH_TIP_CAP), 0);
+
+    const sections = [];
+    if (siblings.length) {
+      sections.push("One fix here also repairs:", ...bullets(siblings, REACH_TIP_CAP));
+    }
+    // Gated on what is left of the cap, not on what the record holds: a bundle wide enough to spend
+    // the whole cap on confirmed members would otherwise print this heading over nothing.
+    const namedBullets = bullets(named, Math.max(REACH_TIP_CAP - siblings.length, 0));
+    if (namedBullets.length) {
+      sections.push(
+        siblings.length
+          ? "It should also repair these, which run the same task type:"
+          : "One fix here should also repair these, which run the same task type:",
+        ...namedBullets);
+    }
+    if (sections.length && unnamed > 0) sections.push(`…and ${fmtInt(unnamed)} more.`);
+    const reachTip = sections.length
+      ? sections.join("\n\n")
+      : `${o.reach} of the same type share this cause in this project; this row is the representative one.`;
+    const reach = (o.reach_units || 1) > 1
+      ? `<span class="reach bundled" tabindex="0" data-tip="${esc(reachTip)}">one fix reaches ${esc(o.reach)}</span>`
+      : "";
+    return `
+    <tr class="op-row">
+      <td class="num rank"><button class="exp-toggle" aria-expanded="false" aria-controls="op-detail-${pos}" aria-label="Toggle opportunity details">${CHEVRON_ICON}</button>${pos + 1}</td>
+      <td><span class="proj elide">${esc(r.project)}</span><span class="tool-badge">${esc(toolLabel(r.build_tool))}</span></td>
+      <td>${unitCellHtml(r.work_unit)}${
+        r.module && clashes.has(rowKey) ? moduleLineHtml(r.module, clashes.get(rowKey)) : ""
+      }${reach}</td>
+      <td>${pillHtml(r.classification === "volatile" ? "volatile" : "nonreloc", r.classification, problemGloss(o))}</td>
+      ${costCellHtml(Number(o.recoverable_hours_per_week), gmax)}
+      ${seenCellHtml(o)}
+      <td class="fix"><button class="copy" data-i="${i}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>Copy prompt</button></td>
+    </tr>
+    <tr class="expand-row"><td colspan="${COLUMN_COUNT}"><div class="detail" id="op-detail-${pos}" hidden="until-found"><div class="detail-grid">${detailGridHtml(o, r, siblings)}</div></div></td></tr>`;
+  }).join("");
+  $("#opportunitiesTable").innerHTML = `
+    <table style="min-width:810px">
+      <thead><tr>${COLUMNS(kinds).join("")}</tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  const root = $("#opportunitiesTable");
+  root.querySelectorAll(".copy").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const o = opportunities[+btn.getAttribute("data-i")];
+      const project = allRecords[o.representative].project;
+      copy(o.prompt, btn, `Copied — ${whereToRun(project)}`, `${capitalized(whereToRun(project))}.`);
+    });
+  });
+  bindInvocationCopy(root);
+  bindTips(root);
+  const openers = bindExpansion(root);
+  if (openers.length) openers[0](true);
+  renderOpportunityPage(0);
+  // The rows the query did not list, and the key to the two kinds of figure, both worded by
+  // scripts/opportunities.py.
+  const foot = savings && kinds.has("remote_cache_adoption") ? [savings.rest_note, savings.legend].filter(Boolean) : [];
+  $("#opFoot").innerHTML = foot.map(line => `<p>${esc(line)}</p>`).join("");
+  $("#opFoot").classList.toggle("hidden", !foot.length);
+}
+
+// A remote Build Cache adoption row: an estimate with no confirmation behind it, so it carries no
+// classification, no recency and no prompt. Its Fix opens the getting-started docs for its build tool,
+// and its detail says what the estimate rests on.
+function savingsRowHtml(s, pos, gmax) {
+  return `
+    <tr class="op-row sp-row">
+      <td class="num rank"><button class="exp-toggle" aria-expanded="false" aria-controls="op-detail-${pos}" aria-label="Toggle opportunity details">${CHEVRON_ICON}</button>${pos + 1}</td>
+      <td><span class="proj elide">${esc(s.project)}</span><span class="tool-badge">${esc(toolLabel(s.build_tool))}</span></td>
+      <td>${unitCellHtml(s.unit_label)}</td>
+      <td>${pillHtml("estimate", s.label, s.note)}</td>
+      ${costCellHtml(Number(s.rate), gmax, true)}
+      <td class="seen"><span class="seen-nodot"></span><span class="seen-state">—</span></td>
+      <td class="fix"><a class="fix-btn" href="${esc(s.fix.url)}" target="_blank" rel="noopener" data-tip="${esc(`Opens the ${s.fix.tool} getting-started docs for the remote Build Cache in a new tab`)}">Enable remote Build Cache${EXT_ICON}</a></td>
+    </tr>
+    <tr class="expand-row"><td colspan="${COLUMN_COUNT}"><div class="detail" id="op-detail-${pos}" hidden="until-found"><div class="detail-grid">${savingsDetailHtml(s)}</div></div></td></tr>`;
+}
+
+function savingsDetailHtml(s) {
+  const builds = Number(s.builds) || 0;
+  const pairs = [
+    ["Problem", esc(s.problem)],
+    ["Estimate", esc(s.estimate || "")],
+    // Linked to the build list where the search has a remote Build Cache field for the tool, opened like the build comparison
+    // a cache-miss row's evidence links to.
+    ["Evidence", (() => {
+      const text = esc(`${builds} CI ${plural(builds, "build", "builds")} with remote Build Cache disabled`);
+      return s.builds_link
+        ? `<span class="scan"><a href="${esc(s.builds_link)}" target="_blank" rel="noopener" data-tip="Opens these builds in the Develocity build list in a new tab">${text}${EXT_ICON}</a></span>`
+        : text;
+    })()],
+    // The simple class name reads; the qualified one is on hover.
+    ["Largest share", (s.top_types || []).map(type =>
+      `<span class="member has-tip" tabindex="0" data-tip="${esc(type)}">${esc(type.split(".").pop())}</span>`).join("")],
+  ];
+  return pairs
+    .filter(([, value]) => value)
+    .map(([label, value]) => `<div class="detail-label">${label}</div><div class="detail-value">${value}</div>`)
+    .join("");
+}
+
+// ── pagination: every opportunity is in the DOM; pages show a slice of the rows ──
+const PAGE_SIZE = 10;
+let opPage = 0;
+function renderOpportunityPage(page) {
+  if (page != null) opPage = page;
+  const rows = [...document.querySelectorAll("#opportunitiesTable .op-row")];
+  if (!rows.length) return;
+  const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  opPage = Math.max(0, Math.min(opPage, pages - 1));
+  rows.forEach((tr, i) => tr.classList.toggle("paged-out", Math.floor(i / PAGE_SIZE) !== opPage));
+  const pager = $("#opPager");
+  if (pages <= 1) {
+    pager.classList.add("hidden");
+    pager.innerHTML = "";
+    return;
+  }
+  pager.classList.remove("hidden");
+  pager.innerHTML = [
+    `<button data-page="${opPage - 1}" aria-label="Previous page"${opPage === 0 ? " disabled" : ""}>‹</button>`,
+    ...Array.from({ length: pages }, (_, p) =>
+      `<button data-page="${p}" aria-label="Page ${p + 1}"${p === opPage ? ' aria-current="page"' : ""}>${p + 1}</button>`),
+    `<button data-page="${opPage + 1}" aria-label="Next page"${opPage === pages - 1 ? " disabled" : ""}>›</button>`,
+  ].join("");
+}
+$("#opPager").addEventListener("click", e => {
+  const btn = e.target.closest("button[data-page]");
+  if (btn && !btn.disabled) renderOpportunityPage(+btn.getAttribute("data-page"));
+});
+
+// The payload phrases the problem mid-sentence, for the summary to drop into prose. Here it stands
+// alone in a tooltip, so it opens like a sentence — capitalized in the UI only, leaving the phrasing
+// the two surfaces share untouched.
+function problemGloss(o) {
+  const phrasing = String(o.problem == null ? "" : o.problem);
+  const open = phrasing.indexOf("(");
+  const gloss = open > -1 ? phrasing.slice(open + 1).replace(/\)\s*$/, "") : phrasing;
+  return gloss ? capitalized(gloss) : gloss;
+}
+
+const EXT_ICON = `<svg class="ext" aria-hidden="true" focusable="false" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>`;
+
+const CHEVRON_ICON = `<svg aria-hidden="true" focusable="false" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 6l6 6-6 6"/></svg>`;
+// Every tile's link to the coverage account below. The tip rides in aria-label as well as data-tip: the
+// visual tooltip is one shared #tip node with no trigger association, so aria-label is what carries
+// the mechanics to a screen reader. The Failure Report's tiles carry the same affordance, so the two
+// reports read as one family.
+const INFO_ICON = `<svg aria-hidden="true" focusable="false" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 7.5h.01"/></svg>`;
+const metricInfo = tip => `<a class="metric-info" href="#coverageSection" data-tip="${esc(tip)}" aria-label="Details. ${esc(tip)}">${INFO_ICON}</a>`;
+// One label builder for every tile, so no card can grow a second affordance. The tip is what the
+// card's own sub-line has no room for, never a restatement of it. Every icon hrefs the coverage
+// account, which is where the run's own account of what it saw lives — it states three of the four
+// tips in full, and the rate card's tip is a definition of the metric rather than a run figure.
+const metricLabel = (text, tip) => `<div class="metric-label">${esc(text)}${tip ? metricInfo(tip) : ""}</div>`;
+// A card's detail line, drawn only where the card has one. Two call sites can hand it an empty
+// string — the count card on a run that confirmed nothing, where `reachSub` has nothing to count,
+// and the Coverage card on an unmeasured run whose records name no build tool — and the guard is
+// what makes those cards draw no detail element rather than an empty one. It buys nothing a reader
+// sees: `.metric-sub` carries no margin and an empty div draws no line box. What it buys is markup
+// that states what the card holds. The suite counts `subLine(` calls to catch a lost detail line:
+// one per card, plus one for the detected card's second branch.
+// One class, so the call carries none: a second class shipped for one card's prose note, and that
+// note is gone.
+// `escaped: true` is for a value already escaped piecewise, which `reachSub` is.
+// Every detail line is the same grey: the figure above it carries the colour of its kind.
+const subLine = (text, { escaped = false } = {}) =>
+  text ? `<div class="metric-sub">${escaped ? text : esc(text)}</div>` : "";
+
+const TIP_KEYS = "Extra cache keys at unchanged commits: identical work at one commit should produce one key, and every extra key is a build that re-executed instead of hitting the cache.";
+const TIP_COMMITS = "How many commits produced extra keys — many commits means a chronic leak, not a one-off.";
+
+const tipHtml = (tip, inner) => `<span class="has-tip" tabindex="0" data-tip="${esc(tip)}">${inner}</span>`;
+const pillHtml = (cls, label, tip) => `<span class="pill ${cls}" tabindex="0" data-tip="${esc(tip)}">${esc(label)}</span>`;
+
+function detailGridHtml(o, r, siblings) {
+  const inv = normalizeWs(r.build_invocation);
+  const pairs = [
+    ["Invocation", inv ? invocationChipHtml(inv) : ""],
+    ["Problem", o.problem ? esc(String(o.problem)) : ""],
+    ["Root-cause hint", r.root_cause_hint ? esc(String(r.root_cause_hint).trim()) : ""],
+    ["Keys", tipHtml(TIP_KEYS, fmtInt(r.severity_distinct_keys))],
+    ["Commits", tipHtml(TIP_COMMITS, fmtInt(r.diverging_commits))],
+    ["Evidence", `<span class="scan">${evidenceHtml(r, o.evidence_link)}</span>`],
+    ["Also repairs", siblings.map(s => `<span class="member">${unitHtml(s)}</span>`).join("")],
+  ];
+  return pairs
+    .filter(([, value]) => value)
+    .map(([label, value]) => `<div class="detail-label">${label}</div><div class="detail-value">${value}</div>`)
+    .join("");
+}
+
+// Returns one setOpen per row, in row order.
+function bindExpansion(root) {
+  return [...root.querySelectorAll(".op-row")].map(row => {
+    const toggle = row.querySelector(".exp-toggle");
+    const detail = document.getElementById(toggle.getAttribute("aria-controls"));
+    const setOpen = open => {
+      toggle.setAttribute("aria-expanded", String(open));
+      row.classList.toggle("open", open);
+      if (open) detail.hidden = false;
+      else detail.setAttribute("hidden", "until-found");
+    };
+    const flip = () => setOpen(toggle.getAttribute("aria-expanded") !== "true");
+    toggle.addEventListener("click", flip);
+    row.addEventListener("click", e => {
+      // Exclusions by intent, not incident: [tabindex] would also match the tabindex that
+      // markTruncated stamps onto clipped names, making name clicks toggle only when short.
+      if (e.target.closest("button, a, [data-tip], .elide")) return;
+      flip();
+    });
+    // The browser's find-in-page reveals hidden="until-found" content itself; mirror its state.
+    detail.addEventListener("beforematch", () => setOpen(true));
+    return setOpen;
+  });
+}
+
+function evidenceHtml(r, link) {
+  if (!r.evidence) return "";
+  const pair = suffix => `${esc(r.evidence.miss_build)}<span class="sep">↔</span><br><span class="hit">${esc(r.evidence.hit_build)}${suffix}</span>`;
+  if (!link) return pair("");
+  return `<a href="${esc(link)}" target="_blank" rel="noopener" data-tip="Opens the Develocity build comparison in a new tab">${pair(EXT_ICON)}</a>`;
+}
+
+// ── coverage: what the run saw, and what it could not ──
+const were = n => n === 1 ? "was" : "were";
+// Nothing is "above" when the card renders alone, with no table to point at. The table holds both
+// kinds of row, so it is drawn whenever either kind exists.
+const listedWhere = () => tableRows.length ? "above" : "in this report";
+
+// The partitions are stated inside the sentences that use them, so a reader can check the account
+// without doing arithmetic across bullets three lines apart.
+function workUnitSentences() {
+  if (rowKinds === "remote-cache-adoption") {
+    return ["This run looked for no cache misses: it skipped cache-miss detection, so it ran no detection queries and no build comparisons."];
+  }
+  const detected = coverage.detected, inspected = coverage.inspected;
+  const units = coverage.opportunities, groups = coverage.opportunity_groups;
+  const sentences = [
+    detected == null
+      ? `This run ran build comparisons on ${coverage.inspected_units}; how many it detected in total was not recorded.`
+      : detected === 0
+        ? "This run detected no candidates in this window."
+      : inspected === 0
+        ? `This run detected ${coverage.detected_units} ${detected === 1 ? "but did not inspect it" : "but inspected none of them"}.`
+        : `This run ran build comparisons on ${coverage.inspected_units}, of the ${coverage.detected_units} it detected.`,
+  ];
+
+  const outcomes = [];
+  if (units) {
+    let clause = `${units} ${were(units)} confirmed as ${units === 1 ? "an avoidable miss" : "avoidable misses"} — the ${groups} ${plural(groups, "opportunity", "opportunities")} ${listedWhere()}`;
+    if (groups < units) clause += `; fewer than ${units} because one fix can repair several ${UNIT_NOUNS.plural}`;
+    outcomes.push(clause);
+  } else if (inspected) {
+    outcomes.push("none were confirmed as avoidable misses — that is not a clean bill of health");
+  }
+  if (coverage.ruled_out) {
+    outcomes.push(`${coverage.ruled_out} ${were(coverage.ruled_out)} ruled out as a build variant, a legitimately different build rather than a miss`);
+  }
+  if (coverage.undetermined) {
+    outcomes.push(`${coverage.undetermined} ${were(coverage.undetermined)} inspected but the comparison could not show a cause`);
+  }
+  if (outcomes.length) {
+    const head = outcomes.slice(0, -1).join("; ");
+    const sentence = head ? `${head} — and ${outcomes[outcomes.length - 1]}` : outcomes[0];
+    sentences.push(sentence.charAt(0).toUpperCase() + sentence.slice(1) + ".");
+  }
+
+  // How the run ended against its target, worded by opportunities.target_ending. Where the run had
+  // what it asked for and left candidates behind, that ending is the REASON those candidates got no
+  // comparison, so it rides inside that sentence; every other ending stands on its own line, which
+  // is also where an undershoot is said. The embedded form is `clause` and carries no reason: the
+  // overshoot's reason explains why the count passed the target, never why the rest were skipped.
+  const ending = coverage.target_ending;
+  // Only a reasonless ending may be embedded. The embedded form is the clause alone — the overshoot's
+  // reason explains why the count passed the target, never why the rest were skipped — so embedding a
+  // `passed` ending dropped "confirmations already in flight are kept" off the page altogether, and
+  // "passed its target of 2" beside three findings then reads as the miscount that clause exists to
+  // rule out. `reached` is the one ending with nothing to lose, and it is the one that embeds.
+  const endingIsTheReason = ending && !ending.reason
+    && coverage.stopped_at_target && coverage.not_inspected && coverage.inspected;
+  if (ending && !endingIsTheReason) {
+    sentences.push(ending.sentence);
+  }
+  if (coverage.not_inspected && coverage.inspected) {
+    const joiner = endingIsTheReason ? ` — the run ${ending.clause} — ` : ", ";
+    const one = coverage.not_inspected === 1;
+    sentences.push(`${one ? "The other candidate" : `The other ${fmtInt(coverage.not_inspected)} candidates`} got no comparison${joiner}so ${one ? "it remains" : "they remain"} unexamined, not cleared.`);
+  } else if (coverage.not_inspected) {
+    // Nothing was inspected, so there is no "other" — the count is the whole detected total.
+    sentences.push(coverage.not_inspected === 1 ? "It remains unexamined, not cleared." : "They remain unexamined, not cleared.");
+  } else if (coverage.detected != null && coverage.inspected && !(ending && ending.ran_out)) {
+    // Dropped where the ending already said the candidates ran out: that is this same fact, and the
+    // ending states it as the reason the target was missed, which is the more useful reading.
+    sentences.push("Every candidate it detected was inspected.");
+  }
+  return sentences;
+}
+
+function projectLines(inst) {
+  if (!inst) {
+    return [`How much of ${esc(meta.instance || "this server")} this run could see was not measured. A project whose
+       builds skip the remote Build Cache, record no commit id, or capture no input files cannot be analyzed —
+       <b>and can still hold avoidable misses</b>.`];
+  }
+  if (!inst.projects_total) {
+    // The sentence the tile and the summary's Coverage line already share: "0 of the 0 projects
+    // were fully analyzable" is the vacuous-over-nothing claim the verdict stopped making, and
+    // this card is where the tile's cross sends the reader for the detail.
+    return ["No project ran CI builds in this window."];
+  }
+  const more = inst.projects_partially_inspected
+    ? `, ${inst.projects_partially_inspected} more partially`
+    : "";
+  const lines = [`${inst.projects_inspected} of the ${inst.projects_total}
+     ${plural(inst.projects_total, "project", "projects")} that ran CI builds in this window were fully
+     analyzable${more}.`];
+  if (inst.projects_skipped) {
+    lines.push(`<b>The ${inst.projects_skipped} that ${were(inst.projects_skipped)} not analyzable can still hold
+       avoidable misses — nothing from ${inst.projects_skipped === 1 ? "it" : "them"} can appear in this run's
+       results.</b>`);
+  } else if (inst.projects_partially_inspected) {
+    lines.push(`<b>The builds it could not analyze can still hold avoidable misses — they cannot appear in this
+       run's results.</b>`);
+  }
+  [["Not analyzable", inst.skipped_named], ["Partially analyzable", inst.partially_inspected_named]]
+    .forEach(([label, list]) => {
+      if (list) lines.push(`<span class="named"><b>${label}:</b> ${esc(list)}</span>`);
+    });
+  return lines;
+}
+
+// The bucket lists already printed above, so a remedy covering the same projects can point at them
+// instead of reprinting ~230 characters of names six lines further down.
+function remedyLines(inst) {
+  const remedies = (derived.remedies || []);
+  if (!remedies.length) return [];
+  // Each printed name list maps to the phrase pointing back at it — the partially-analyzable
+  // bucket must not be referenced as "not analyzable".
+  const printed = new Map();
+  // Only where the project block above is drawn: a run that includes only remote Build Cache adoption rows
+  // draws none, so its remedies name their projects themselves.
+  if (inst && rowKinds !== "remote-cache-adoption") {
+    if (inst.skipped_named) printed.set(inst.skipped_named, "not analyzable above");
+    if (inst.partially_inspected_named && !printed.has(inst.partially_inspected_named)) {
+      printed.set(inst.partially_inspected_named, "partially analyzable above");
+    }
+  }
+  let counted = 0;
+  const lines = remedies.map(rem => {
+    let who = "";
+    if (rem.projects != null) {
+      counted++;
+      who = printed.has(rem.named)
+        ? ` — the ${rem.projects} ${plural(rem.projects, "project", "projects")} ${printed.get(rem.named)}`
+        : ` — ${rem.projects} ${plural(rem.projects, "project", "projects")}${rem.named ? `: ${rem.named}` : ""}`;
+    }
+    // A note is a sentence or two, so it goes on its own line under the label and the links rather than
+    // between them, where it broke the one line they share into three.
+    return `<span class="remedy"><span class="label">${esc(rem.label)}</span><span class="who">${esc(who)}</span>${
+      (rem.links || []).map(l => `<a class="doclink" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.tool)}${EXT_ICON}</a>`).join("")
+    }</span>${rem.note ? `<div class="remedy-note">${esc(rem.note)}</div>` : ""}`;
+  });
+  if (counted >= 2) {
+    lines.push(`<span class="cov-note">A project can need more than one of these, so the counts can overlap.</span>`);
+  }
+  return lines;
+}
+
+// Grouped under labels rather than run together: each group answers one question, a line is one
+// sentence, and a group with nothing to say is absent rather than empty.
+function covBlockHtml(label, lines) {
+  const filled = lines.filter(Boolean);
+  if (!filled.length) return "";
+  return `<div class="foot-block"><div class="foot-label">${esc(label)}</div>${filled.map(l => `<div>${l}</div>`).join("")}</div>`;
+}
+
+function renderCoverage() {
+  $("#coverage").innerHTML = [
+    covBlockHtml("How much was surveyed", workUnitSentences().map(esc)),
+    // Which projects the cache-miss analysis could read: nothing a run that includes only remote Build Cache adoption rows did.
+    covBlockHtml("Which projects counted", rowKinds === "remote-cache-adoption" ? [] : projectLines(instanceCoverage)),
+    covBlockHtml("So the next run sees more", remedyLines(instanceCoverage)),
+    // Why the table is in the order it is: the one question the blocks above never answered, and the
+    // reader who sees only the Recoverable bar has no way to tell a bundle's total from one unit's.
+    // The sentences come from scripts/opportunities.py, beside the sort they describe.
+    //
+    // Only where there are rows to order. A run that confirmed nothing still gets a report, and its
+    // coverage account is the point of it, but an ordering account under "No savings opportunities to
+    // list." explains the order of nothing.
+    covBlockHtml("Why this order",
+      tableRows.length ? ((derived && derived.ranking_notes) || []).map(esc) : []),
+    covBlockHtml("Reading these numbers", [
+      rowKinds === "remote-cache-adoption" ? "" : `Recoverable CI time${savings ? " without a ~" : ""} is measured, not estimated: CI compute actually spent re-running
+     ${esc(UNIT_NOUNS.plural)} whose cached result should have matched, observed over this window.`,
+      // No sentence for the adoption estimate: its ~, its line in the tile, the tooltip and the legend
+      // under the table already mark it as an estimate.
+    ]),
+  ].join("");
+}
+
+// ── interactions ──
+async function copyText(text) {
+  try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(text); return true; } } catch (e) {}
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.setAttribute("readonly", "");
+    ta.style.cssText = "position:fixed;top:-2000px;left:0;opacity:0";
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    const ok = document.execCommand("copy"); document.body.removeChild(ta);
+    if (ok) return true;
+  } catch (e) {}
+  return false;
+}
+async function copy(text, btn, msg, whereMsg) {
+  const ok = await copyText(text);
+  if (ok) {
+    showToast(msg || "Fix prompt copied to clipboard");
+    if (btn) { const o = btn.innerHTML; btn.classList.add("done"); btn.textContent = "Copied"; setTimeout(() => { btn.classList.remove("done"); btn.innerHTML = o; }, 1600); }
+  } else { openCopyModal(text, whereMsg); }
+}
+const modal = $("#modal"), modalText = $("#modalText");
+// The one source for where a copied prompt runs; the toast and the modal both phrase it from here.
+const whereToRun = project => `paste into an AI agent opened in your checkout of ${project}`;
+function openCopyModal(text, msg) {
+  $("#modalWhere").textContent = msg || "";
+  $("#modalWhere").classList.toggle("hidden", !msg);
+  modalText.value = text; modal.classList.remove("hidden"); modalText.focus(); modalText.select();
+}
+function closeCopyModal() { modal.classList.add("hidden"); }
+$("#modalClose").addEventListener("click", closeCopyModal);
+modal.addEventListener("click", e => { if (e.target === modal) closeCopyModal(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !modal.classList.contains("hidden")) closeCopyModal(); });
+
+let toastT;
+const TOAST_MS = 3200;
+function showToast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), TOAST_MS); }
+
+const tip = $("#tip");
+function showTip(el, text) {
+  tip.textContent = text;
+  tip.classList.add("show");
+  const r = el.getBoundingClientRect();
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  const below = r.bottom + 6;
+  tip.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + "px";
+  tip.style.top = (below + h + 8 > window.innerHeight ? r.top - h - 6 : below) + "px";
+}
+const hideTip = () => tip.classList.remove("show");
+function onHoverFocus(el, show) {
+  el.addEventListener("mouseenter", show);
+  el.addEventListener("mouseleave", hideTip);
+  el.addEventListener("focus", show);
+  el.addEventListener("blur", hideTip);
+}
+// Reads before writes: setting tabindex inside a measuring loop would force a reflow per span.
+function markTruncated(root) {
+  [...root.querySelectorAll(".elide")]
+    .filter(el => el.scrollWidth > el.clientWidth)
+    .forEach(el => el.setAttribute("tabindex", "0"));
+}
+function bindTips(root) {
+  root.querySelectorAll("[data-tip]").forEach(el => onHoverFocus(el, () => showTip(el, el.getAttribute("data-tip"))));
+  root.querySelectorAll(".elide").forEach(el =>
+    onHoverFocus(el, () => { if (el.scrollWidth > el.clientWidth) showTip(el, el.textContent); }));
+  markTruncated(root);
+}
+document.addEventListener("scroll", hideTip, true);
+
+// ── entry point ──
+if (!meta) {
+  showUnfilled("This template has not been filled: the <b>#report-data</b> island carries no payload. " +
+    "The detection skill fills it at the end of a run (see the skill's <b>references/report.md</b>).");
+} else if (!derived) {
+  showUnfilled("This report was written without a <b>derived</b> block, so the figures it would present " +
+    "cannot be trusted to match the run's summary. Re-fill the template with the skill's " +
+    "<b>scripts/report.sh fill-report</b> (see the skill's <b>references/report.md</b>).");
+} else if (records.length === 0 && rowKinds !== "remote-cache-adoption") {
+  // The note stays, and so do the tiles — the Failure Report keeps its tiles on an empty run,
+  // because the run with nothing to list is the run whose Coverage verdict matters most, and
+  // hiding the row took the verdict off this surface exactly there. The note claims only the
+  // absence of confirmed misses: an empty records array says nothing about detection, whose
+  // authoritative count is meta.candidates_detected and renders in the tile beside this.
+  showStateNote("<b>No avoidable cache misses were confirmed in this window.</b> That is not a clean bill of health — " +
+    `what the run against <b>${esc(meta.instance)}</b> for ${esc(meta.window_start)} → ${esc(meta.window_end)} UTC ` +
+    "detected, and what it could and could not see, is in the tiles and the coverage account below.", { keepTiles: true });
+  render();
+} else {
+  render();
+}
+</script>
+</body>
+</html>
